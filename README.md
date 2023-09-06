@@ -4,7 +4,7 @@
 
 # SQUINT3 (Sparse Quad Union Indexed Nibble Trie)
 
-- https://github.com/idle-PB/SQUINT
+- https://github.com/idle-PB/Squint3
 
 Squint is the result of realising that you can reduce a Trie from 256 nodes down to 16 nodes at only a cost of twice the lookup by indexing the key by nibbles.
 You then realise you can use a quad to store the indices of 16 offsets into a sparse array and reduce the structure down to 2 quads per node:
