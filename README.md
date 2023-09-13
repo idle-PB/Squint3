@@ -6,14 +6,17 @@
 
 - https://github.com/idle-PB/Squint3
 
-Squint is the result of realising that you can reduce a Trie from 256 nodes down to 16 nodes at only a cost of twice the lookup by indexing the key by nibbles.
-You then realise you can use a quad to store the indices of 16 offsets into a sparse array and reduce the structure down to 2 quads per node:
+Squint is a compact prefix Trie indexed by nibbles into a sparse array with performance metrics close to a map
 
     *vector,(squint.q | value.i): key->squint->*vector\e[offset]
 
-this results in a very compact Trie with _O_(_K_) performance and a memory size 32 times smaller!
+It provides O(K) performance with a memory size ~32 times smaller than a 256 node trie
 
-Performace is variable but as a dynamic structure it's very fast.  
+Squint is at worst two times slower than a Map for set operations, look ups are closer to 1:1 or faster 
+
+Squint is lexographicaly sorted, sorting is magnitudes faster than what you could achieve with a map list or unsorted array 
+
+Squint also supports collections or subtries, which facilitates tasks like in memory DB's and short cuts setting and looking up keys   
 
 Keys can either be numeric integers, binary, UTF-8 or UCS-2 Unicode strings; default is UCS-2 Unicode
 
