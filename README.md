@@ -25,7 +25,7 @@ Supports: String key functions supported Set, Get, Enum, Walk, Delete and Prune 
 
 Squint is threadsafe with lock free Sets and Gets 
 
-runs on x86/x64 asm and c backended and Arm 32/64 PI3 PI4    
+runs on x86/x64 fasm and c backend and also on Arm 32/64, PI3 PI4    
 
 A test compared to a map where the map and trie are prefilled with 4,194,304 random keys, string test 11 bytes and Numeric 4 bytes  
 Processor	11th Gen Intel(R) Core(TM) i5-11500 @ 2.70GHz, 2712 Mhz, 6 Core(s), 12 Logical Processor(s)
