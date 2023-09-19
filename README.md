@@ -26,7 +26,7 @@ Squint also supports branches for collections or subtries, which facilitates tas
 
 Keys can either be numeric integers, binary, UTF-8 or UCS-2 Unicode strings, default is UCS-2 Unicode.
 
-String key functions supported: Set, Get, Enum, EnumNode, Walk, Delete and Prune with a flag in Delete.
+String key functions supported: Set, Get, Enum, EnumNode, Walk, WalkNode, Delete and Prune with a flag in Delete.
 
 Numeric or Binary keys: SetNumeric, GetNumeric, DeleteNumeric, WalkNumeric. 
 
