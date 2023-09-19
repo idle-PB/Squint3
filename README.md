@@ -6,14 +6,17 @@
 
 - https://github.com/idle-PB/Squint3
 
-Squint is the result of realising that you can reduce a Trie from 256 nodes down to 16 nodes at only a cost of twice the lookup by indexing the key by nibbles.
-You then realise you can use a quad to store the indices of 16 offsets into a sparse array and reduce the structure down to 2 quads per node:
+Squint is a compact prefix Trie indexed by nibbles into a sparse array with performance metrics close to a map
 
     *vector,(squint.q | value.i): key->squint->*vector\e[offset]
 
-this results in a very compact Trie with _O_(_K_) performance and a memory size 32 times smaller!
+It provides O(K) performance with a memory size ~32 times smaller than a 256 node trie
 
-Performace is variable but as a dynamic structure it's very fast.  
+Squint is at worst two times slower than a Map for set operations, look ups are closer to 1:1 or faster 
+
+Squint is lexographicaly sorted, sorting is magnitudes faster than what you could achieve with a map list or unsorted array 
+
+Squint also supports collections or subtries, which facilitates tasks like in memory DB's and short cuts setting and looking up keys   
 
 Keys can either be numeric integers, binary, UTF-8 or UCS-2 Unicode strings; default is UCS-2 Unicode
 
@@ -22,7 +25,33 @@ Supports: String key functions supported Set, Get, Enum, Walk, Delete and Prune 
 
 Squint is threadsafe with lock free Sets and Gets 
 
-runs on x86/x64 asm and c backended and Arm 32/64 PI3 PI4     
+runs on x86/x64 fasm and c backend and also on Arm 32/64, PI3 PI4    
+
+A test compared to a map where the map and trie are prefilled with 4,194,304 random keys, string test 11 bytes and Numeric 4 bytes  
+Processor	11th Gen Intel(R) Core(TM) i5-11500 @ 2.70GHz, 2712 Mhz, 6 Core(s), 12 Logical Processor(s)
+
+Squint Numeric lookup items 53,566,403 p/s avg per thread 4,869,673
+lookup rate 204.34 mb p/s
+lookup time 18.67 ns
+Squint Numeric writes items 834,431
+Write rate 3.18 mb p/s
+num items 4,194,304 mem 530.92mb keysize 32.00 mb
+ 
+Squint lookup items 15,463,890 p/s avg per thread 1,405,808
+lookup rate 162.22 mb p/s
+lookup time 64.67 ns
+Squint writes items 926,961
+Writes rate 9.72 mb p/s
+num items 4,194,304 mem 90.37mb keysize 45.87 mb
+
+Map lookup items 11,191,928  p/s  avg per thread 1,017,448
+lookup rate 117.41 mb p/s
+lookup time 89.35 ns
+map writes items 823,271 p/s
+Write rate 8.64 mb p/s
+num items 4,194,304 mem 109.87mb keysize 45.87 mb
+
+Similar Structures are  
 
 # References
 
