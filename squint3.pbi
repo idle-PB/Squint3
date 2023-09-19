@@ -2,7 +2,7 @@
 Macro Comments() 
   ; SQUINT 3, Sparse Quad Union Indexed Nibble Trie
   ; Copyright Andrew Ferguson aka Idle (c) 2020 - 2023 
-  ; Version 3.1.1a
+  ; Version 3.1.2
   ; PB 5.72-6.02b 32bit/64bit asm and c backends for Windows,Mac OSX,Linux,PI,M1
   ; Thanks Wilbert for the high low insight and utf8 conversion help.
   ; Squint is a compact prefix Trie indexed by nibbles into a sparse array with performance metrics close to a map
@@ -94,6 +94,7 @@ DeclareModule SQUINT
   Declare SquintDeleteNode(*this.squint,*subtrie,*key,prune=0,mode=#PB_Unicode)
   Declare SquintWalkNode(*this.squint,*subtrie,*pfn.squint_CB,*userdata=0) 
   Declare SquintEnum(*this.squint,*key,*pfn.squint_CB,*userdata=0,mode=#PB_Unicode)
+  Declare SquintEnumNode(*this.squint,*subtrie,*key,*pfn.squint_CB,*userdata=0,mode=#PB_Unicode)
   
   Declare SquintSetNumeric(*this.squint,*key,value.i,size=#Squint_Integer)
   Declare SquintGetNumeric(*this.squint,*key,size = #Squint_Integer)
@@ -109,6 +110,7 @@ DeclareModule SQUINT
     Set(*subtrie,*key,value.i,mode=#PB_Unicode)
     Get(*subtrie,*key,mode=#PB_Unicode,bval=1)
     Enum(*key,*pfn.squint_CB,*userdata=0,mode=#PB_Unicode)
+    EnumNode(*subtrie,*key,*pfn.squint_CB,*userdata=0,mode=#PB_Unicode)
     Walk(*subtrie,*pfn.squint_CB,*userdata=0)
     SetNumeric(*key,value.i,size=#Squint_Integer) 
     GetNumeric(*key,size= #Squint_Integer) 
@@ -123,6 +125,7 @@ DeclareModule SQUINT
     Data.i @SquintSetNode()
     Data.i @SquintGetNode()
     Data.i @SquintEnum()
+    Data.i @SquintEnumNode() 
     Data.i @SquintWalkNode()
     Data.i @SquintSetNumeric()
     Data.i @SquintGetNumeric()
@@ -661,18 +664,19 @@ Module SQUINT
     EndIf
     ProcedureReturn *node
   EndProcedure
-  
-  Procedure SquintEnum(*this.squint,*key,*pfn.squint_CB,*userdata=0,mode=#PB_Unicode)
+   
+  Procedure SquintEnumNode(*this.squint,*subtrie,*key,*pfn.squint_CB,*userdata=0,mode=#PB_Unicode)
     
   ;##################################################################################
   ;#  Enumerates the Trie from a given key   
   ;#    *this.squint instance from SquintNew() 
-  ;#    *key   address of a null terminated string can be unicode ascii or UTF8
+  ;#    *subtrie 0 Or the addess of a previously stored node       
+  ;#    *key address of a null terminated string can be unicode ascii Or UTF8
   ;#     mode.i  Desired key format #PB_Uniocde, #PB_Ascii, #PB_UTF8  
   ;#    *pfn.squint_CB address of callback function as Squint_CB(*key,*value=0,*userdata=0) 
   ;#        where *key is pointer to the key *value is pointer to the *value, *userDate      
   ;# example    
-  ;#     squintEnum(sq,@"cars:toyota:",@MyCallback())       
+  ;#     squintEnum(sq,*subtrie,@"cars:toyota:",@MyCallback())       
   ;#  or via interface 
   ;#     sq\Enum@"cars:toyota:",@MyCallback())   
   ;################################################################################## 
@@ -682,8 +686,13 @@ Module SQUINT
     Protected outkey.s{1024} 
         
     _LockMutex(gwrite) 
-       
-    *node = *this\root 
+    
+    If *subtrie = 0
+      *node = *this\root
+    Else
+      *node = *subtrie  & #Squint_Pmask 
+    EndIf 
+  
     _CONVERTUTF8()
     
     While vchar 
@@ -726,6 +735,24 @@ Module SQUINT
     
   EndProcedure
   
+  Procedure SquintEnum(*this.squint,*key,*pfn.squint_CB,*userdata=0,mode=#PB_Unicode)
+    
+  ;##################################################################################
+  ;#  Enumerates the Trie from a given key   
+  ;#    *this.squint instance from SquintNew() 
+  ;#    *key   address of a null terminated string can be unicode ascii or UTF8
+  ;#     mode.i  Desired key format #PB_Uniocde, #PB_Ascii, #PB_UTF8  
+  ;#    *pfn.squint_CB address of callback function as Squint_CB(*key,*value=0,*userdata=0) 
+  ;#        where *key is pointer to the key *value is pointer to the *value, *userDate      
+  ;# example    
+  ;#     squintEnum(sq,@"cars:toyota:",@MyCallback())       
+  ;#  or via interface 
+  ;#     sq\Enum@"cars:toyota:",@MyCallback())   
+  ;################################################################################## 
+    
+   SquintEnumNode(*this,0,*key,*pfn,*userdata,mode) 
+    
+  EndProcedure   
    
   Procedure SquintWalk(*this.squint,*pfn.squint_CB,*userdata=0) 
     
@@ -1020,8 +1047,11 @@ CompilerIf #PB_Compiler_IsMainFile
     SubTrieA = sq\Set(0,@"subtrieA:",123)    ;Set it with utf8 flag it returns the root of the sub trie 
    
     key = "abc"                                
-    sq\Set(SubTrieA,@"abc",1)          ;key evaluates as subtrieA:abc  to the sub trie  
-        
+    sq\Set(SubTrieA,@key,1)          ;key evaluates as subtrieA:abc  to the sub trie  
+    
+    key = "abcd" 
+    sq\Set(SubTrieA,@key,1)          ;key evaluates as subtrieA:abcd  to the sub trie  
+    
     *key = UTF8("utf8:" + Chr($20AC) + Chr($A9))  
     sq\Set(SubTrieA,*key,2,#PB_UTF8) ;add it to the sub trie with utf8 key  
     
@@ -1040,9 +1070,9 @@ CompilerIf #PB_Compiler_IsMainFile
     PrintN(" look up subtrie node " + Str( sq\Get(0,@"subtrieA:",#PB_Unicode,0)))   
     PrintN(" look up its value  " +   Str(sq\Get(0,@"subtrieA:")))  
     
-    PrintN("___ENUM from subtrieA_____")
-    key = "subtrieA"
-    sq\Enum(@key,@CBSquint())                 ;returns the root key + sub keys   
+    PrintN("___ENUM from stored pointer to subtrieA")
+    key = "ab"
+    sq\EnumNode(SubTrieA,@key,@CBSquint())                 ;returns the root key + sub keys   
     
     key.s = "subtrie_b_"                      ;test raw access no interface   
     SubTrie_B = SquintSetNode(sq,0,@key,456)  ;make another sub trie root_pb 
