@@ -26,35 +26,49 @@ Numeric or Binary keys:  SetNumeric, GetNumeric, DeleteNumeric, WalkNumeric.
 
 Squint is threadsafe with lock free Sets and Gets 
 
-runs on x86/x64 fasm and c backend and also on Arm 32/64, PI3 PI4    
+Runs on x86/x64 fasm and c backend and also on Arm 32/64, PI3 PI4    
 
 A test compared to a map where the map and trie are prefilled with 4,194,304 random keys, string test 11 bytes and Numeric 4 bytes  
-Processor	11th Gen Intel(R) Core(TM) i5-11500 @ 2.70GHz, 2712 Mhz, 6 Core(s), 12 Logical Processor(s)
 
-Squint Numeric lookup items 53,566,403 p/s avg per thread 4,869,673
+Processor 11th Gen Intel(R) Core(TM) i5-11500 @ 2.70GHz, 2712 Mhz, 6 Core(s), 12 Logical Processor(s)
+
+## Squint Numeric lookup items 53,566,403 p/s avg per thread 4,869,673
+
 lookup rate 204.34 mb p/s
+
 lookup time 18.67 ns
+
 Squint Numeric writes items 834,431
+
 Write rate 3.18 mb p/s
+
 num items 4,194,304 mem 530.92mb keysize 32.00 mb
  
-Squint lookup items 15,463,890 p/s avg per thread 1,405,808
+## Squint lookup items 15,463,890 p/s avg per thread 1,405,808
+
 lookup rate 162.22 mb p/s
+
 lookup time 64.67 ns
+
 Squint writes items 926,961
+
 Writes rate 9.72 mb p/s
+
 num items 4,194,304 mem 90.37mb keysize 45.87 mb
 
-Map lookup items 11,191,928  p/s  avg per thread 1,017,448
+## Map lookup items 11,191,928  p/s  avg per thread 1,017,448
+
 lookup rate 117.41 mb p/s
+
 lookup time 89.35 ns
+
 map writes items 823,271 p/s
+
 Write rate 8.64 mb p/s
+
 num items 4,194,304 mem 109.87mb keysize 45.87 mb
 
-Similar Structures are  
-
-# References
+# Similar Structures  
 
 - _[QP Tries: Smaller and Faster Than Crit-Bit Tries]_ — by [Tony Finch].
 - _[Crit-Bit Trees]_ — by Daniel J. Bernstein.
