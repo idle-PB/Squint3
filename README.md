@@ -22,19 +22,19 @@ Squint is at worst two times slower than a Map for set operations, look ups are 
 
 Squint is lexographicaly sorted, sorting is magnitudes faster than what you could achieve with a map list or unsorted array 
 
-Squint also supports collections or subtries, which facilitates tasks like in memory DB's and short cuts setting and looking up keys   
+Squint also supports branches for collections or subtries, which facilitates tasks like in memory DB's and shortcuts for setting and looking up keys   
 
-Keys can either be numeric integers, binary, UTF-8 or UCS-2 Unicode strings; default is UCS-2 Unicode
+Keys can either be numeric integers, binary, UTF-8 or UCS-2 Unicode strings, default is UCS-2 Unicode.
 
 String key functions supported: Set, Get, Enum, EnumNode, Walk, Delete and Prune with a flag in Delete.
 
-Numeric or Binary keys:  SetNumeric, GetNumeric, DeleteNumeric, WalkNumeric. 
+Numeric or Binary keys: SetNumeric, GetNumeric, DeleteNumeric, WalkNumeric. 
 
-Squint is threadsafe with lock free Sets and Gets 
+Squint is threadsafe with lock free Sets and Gets. 
 
-Runs on x86/x64 fasm and c backend and also on Arm 32/64, PI3 PI4    
+It runs on x86/x64 with fasm and c backends and also on Arm 32/64, PI3 PI4    
 
-A test compared to a map where the map and trie are prefilled with 4,194,304 random keys, string test 11 bytes and Numeric 4 bytes  
+A test compared to a map where the map and trie are prefilled with 4,194,304 random keys, String test key length averages 11 bytes and Numeric keys 4 bytes  
 
 Processor 11th Gen Intel(R) Core(TM) i5-11500 @ 2.70GHz, 2712 Mhz, 6 Core(s), 12 Logical Processor(s)
 
