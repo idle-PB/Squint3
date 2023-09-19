@@ -48,7 +48,7 @@ Squint Numeric writes items 834,431
 
 Write rate 3.18 mb p/s
 
-num items 4,194,304 mem 530.92mb keysize 32.00 mb
+num items 4,194,304 mem 226.86mb keysize 16.00 mb
  
 ## Squint string lookup items 15,463,890 p/s avg per thread 1,405,808
 
