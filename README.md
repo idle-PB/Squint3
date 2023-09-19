@@ -8,8 +8,14 @@
 
 Squint is a compact prefix Trie indexed by nibbles into a sparse array with performance metrics close to a map
 
-    *vector,(squint.q | value.i): key->squint->*vector\e[offset]
-
+    Structure squint_node Align #PB_Structure_AlignC
+       *vertex.edge
+       StructureUnion
+         squint.q
+         value.i 
+       EndStructureUnion
+    EndStructure 
+     
 It provides O(K) performance with a memory size ~32 times smaller than a 256 node trie
 
 Squint is at worst two times slower than a Map for set operations, look ups are closer to 1:1 or faster 
