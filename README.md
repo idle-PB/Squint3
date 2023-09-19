@@ -44,7 +44,7 @@ Write rate 3.18 mb p/s
 
 num items 4,194,304 mem 530.92mb keysize 32.00 mb
  
-## Squint lookup items 15,463,890 p/s avg per thread 1,405,808
+## Squint string lookup items 15,463,890 p/s avg per thread 1,405,808
 
 lookup rate 162.22 mb p/s
 
