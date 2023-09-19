@@ -38,17 +38,17 @@ A test compared to a map where the map and trie are prefilled with 4,194,304 ran
 
 Processor 11th Gen Intel(R) Core(TM) i5-11500 @ 2.70GHz, 2712 Mhz, 6 Core(s), 12 Logical Processor(s)
 
-## Squint Numeric lookup items 53,566,403 p/s avg per thread 4,869,673
+## Squint Numeric lookup items 55,910,982 p/s avg per thread 5,082,816
 
-lookup rate 204.34 mb p/s
+lookup rate 213.28 mb p/s
 
-lookup time 18.67 ns
+lookup time 17.89 ns
 
-Squint Numeric writes items 834,431
+Squint Numeric writes items 883,304
 
-Write rate 3.18 mb p/s
+Write rate 3.37 mb p/s
 
-num items 4,194,304 mem 226.86mb keysize 16.00 mb
+num items 4,194,304 mem 229.72mb keysize 16.00 mb
  
 ## Squint string lookup items 15,463,890 p/s avg per thread 1,405,808
 
