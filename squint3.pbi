@@ -644,25 +644,32 @@ Module SQUINT
     If Not *node
       ProcedureReturn 0
     EndIf
-    For a=0 To 15
+    
+    For a =0 To 15
       
       offset = (*node\squint >> (a<<2)) & $f
       If (*node\vertex And *node\squint)
         _GETNODECOUNT()
         If (offset <> 15 Or nodecount = 16)
           _POKENHL(*outkey,depth,a)
-          IEnum(*this,*node\Vertex\e[offset] & #Squint_Pmask,depth+1,*pfn,*outkey,*userdata)
+         If IEnum(*this,*node\Vertex\e[offset] & #Squint_Pmask,depth+1,*pfn,*outkey,*userdata) = 0 
+           Break 
+         EndIf  
         EndIf
+        
       EndIf
-      
     Next
+    
     If *node\vertex=0
       If *pfn
         PokeA(*outkey+((depth>>1)),0)
-        *pfn(*outkey,*node\value,*userdata)
+        If *pfn(*outkey,*node\value,*userdata) = 0 
+          ProcedureReturn 0
+        EndIf   
       EndIf
     EndIf
     ProcedureReturn *node
+    
   EndProcedure
    
   Procedure SquintEnumNode(*this.squint,*subtrie,*key,*pfn.squint_CB,*userdata=0,mode=#PB_Unicode)
@@ -1194,11 +1201,11 @@ CompilerIf #PB_Compiler_IsMainFile
       key = Hex(num);
       CompilerIf #TestNumeric 
          CompilerIf #TESTMAP = 0
-           keylen+8 
+           keylen+4 
          CompilerElse 
            keylen + StringByteLength(Str(num))
          CompilerEndIf 
-         sq\SetNumeric(@num,1,8) 
+         sq\SetNumeric(@num,1,4) 
          mp(Str(num))=1 
       CompilerElse   
         keylen+StringByteLength(key) 
@@ -1208,7 +1215,7 @@ CompilerIf #PB_Compiler_IsMainFile
     Next  
     
     CompilerIf #TestNumeric 
-      avgkeylen=4 
+      avgkeylen=8 
     CompilerElse  
       avgkeylen = keylen/lt    
     CompilerEndIf  
@@ -1243,12 +1250,12 @@ CompilerIf #PB_Compiler_IsMainFile
           CompilerEndIf   
         CompilerElse   
           CompilerIf #TestNumeric  
-            ;x = FindMapElement(mp(),Str(num)) & 1    ;swap comment for 10 x map speed 
+            ;x = FindMapElement(mp(),Str(num)) & 1    ;swap comment for 5 x map speed 
             x = mp(Str(num)) & 1                      ;this shouldn't slow it down   
             cx = (1 | x)   
           CompilerElse   
             key = Hex(num)
-            ;x = (FindMapElement(mp(),key) & 1)         ;swap comment for 10 x map speed 
+            ;x = (FindMapElement(mp(),key) & 1)         ;swap comment for 5 x map speed 
             x = mp(key) & 1 
             cx = (1 | x)   
           CompilerEndIf  
@@ -1286,7 +1293,7 @@ CompilerIf #PB_Compiler_IsMainFile
         CompilerEndIf  
         
         *ct\i + 1 
-        Delay(0) 
+        ;Delay(0) 
       Until gQuit  
       
     EndProcedure  
@@ -1368,6 +1375,7 @@ CompilerIf #PB_Compiler_IsMainFile
       out +  "lookup time " + FormatNumber((1000.0/total)*1000000 ,2,".",",") + " ns"  + #CRLF$
       out +  "map writes items " + FormatNumber(counts(NUMTHREADS-1),0)  + " p/s" + #CRLF$
       out +  "Write rate " +  FormatNumber(counts(NUMTHREADS-1)*avgkeylen/1024/1024,2,".",",") + " mb p/s"  + #CRLF$
+      out +  "num items " + FormatNumber(lt,0,".",",") + " mem " + StrF(memsize/(1024*1024),2) + "mb keysize " + StrF(keylen/(1024*1024),2) + " mb"  + #CRLF$     
     CompilerElse 
       CompilerIf #TestNumeric 
         out +  "Squint Numeric lookup items " + FormatNumber(total,0) + " p/s" + " avg per thread " + FormatNumber(avg,0) +  #CRLF$
@@ -1382,9 +1390,10 @@ CompilerIf #PB_Compiler_IsMainFile
         out +  "Squint writes items " + FormatNumber(counts(NUMTHREADS-1),0)  + #CRLF$
         out +  "Writes rate " + FormatNumber(counts(NUMTHREADS-1)*avgkeylen/1024/1024,2,".",",") + " mb p/s"   + #CRLF$ 
       CompilerEndIf   
+      out +  "num items " + FormatNumber(lt,0,".",",") + " mem " + StrF(sq\Size() / (1024*1024),2) + "mb keysize " + StrF(keylen/(1024*1024),2) + " mb"  + #CRLF$     
+      
     CompilerEndIf 
-    
-    out +  "num items " + FormatNumber(lt,0,".",",") + " mem " + StrF(memsize/(1024*1024),2) + "mb keysize " + StrF(keylen/(1024*1024),2) + " mb"  + #CRLF$   
+        
     out + tout 
     Print(out) 
     
