@@ -69,6 +69,7 @@ DeclareModule SQUINT
   Structure squint Align #PB_Structure_AlignC
     *vt
     size.i
+    count.i
     gEnum.i
     write.i
     *root.squint_node
@@ -103,7 +104,8 @@ DeclareModule SQUINT
   Declare SquintWalkNumeric(*this.squint,*pfn.squint_CB,*userdata=0)
   
   Declare SquintSize(*this.squint)
-    
+  Declare SquintNumKeys(*this.squint)
+  
   ;-Squint Inteface iSquint  
   Interface iSquint
     Free(*pfn.Squint_CBFree=0)
@@ -118,6 +120,7 @@ DeclareModule SQUINT
     DeleteNumeric(*key,size=#Squint_Integer)
     WalkNumeric(*pfn.Squint_CB,*userdata=0)
     Size()
+    NumKeys()
   EndInterface
   
   DataSection: vtSquint:
@@ -133,6 +136,7 @@ DeclareModule SQUINT
     Data.i @SquintDeleteNumeric()
     Data.i @SquintWalkNumeric() 
     Data.i @SquintSize() 
+    Data.i @SquintNumKeys()
   EndDataSection   
   
 EndDeclareModule
@@ -482,6 +486,8 @@ Module SQUINT
        
     *this\write = 0    ;<----------------------------------Clear the write flag     
     
+    *this\count+1 
+    
     _unLockMutex(gwrite)
     
     If value 
@@ -821,6 +827,10 @@ Module SQUINT
   
   Procedure SquintSize(*this.squint) 
     ProcedureReturn *this\size 
+  EndProcedure   
+  
+  Procedure SquintNumKeys(*this.squint)
+    ProcedureReturn *this\count 
   EndProcedure   
   
   ;-Numeric functions 
