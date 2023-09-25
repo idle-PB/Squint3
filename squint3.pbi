@@ -85,9 +85,10 @@ DeclareModule SQUINT
   
   ;-Squint Callback prototype 
   Prototype Squint_CB(*key,*value=0,*userdata=0)
+  Prototype Squint_CBFree(*mem) 
   
   Declare SquintNew()
-  Declare SquintFree(*this.Squint)
+  Declare SquintFree(*this.Squint,*pfn.Squint_CBFree=0)
   
   Declare SquintSetNode(*this.squint,*subtrie,*key,value.i,mode=#PB_Unicode)
   Declare SquintGetNode(*this.squint,*subtrie,*key,mode=#PB_Unicode,bval=1)
@@ -105,7 +106,7 @@ DeclareModule SQUINT
     
   ;-Squint Inteface iSquint  
   Interface iSquint
-    Free()
+    Free(*pfn.Squint_CBFree=0)
     Delete(*subtrie,*key,prune=0,mode=#PB_Unicode)
     Set(*subtrie,*key,value.i,mode=#PB_Unicode)
     Get(*subtrie,*key,mode=#PB_Unicode,bval=1)
@@ -371,7 +372,7 @@ Module SQUINT
     EndIf
   EndProcedure
   
-  Procedure ISquintFree(*this.squint,*node.squint_node=0)
+  Procedure ISquintFree(*this.squint,*node.squint_node=0,*pfn.Squint_CBFree=0)
     Protected a,offset,nodecount
     If Not *node
       ProcedureReturn 0
@@ -389,6 +390,9 @@ Module SQUINT
     _LockMutex(gwrite)
     If *node\vertex
       _GETNODECOUNT()
+      If *pfn 
+        *pfn(*node\value) 
+      EndIf 
       FreeMemory(*node\Vertex & #Squint_Pmask) 
       *node\vertex=0
     EndIf
@@ -396,7 +400,7 @@ Module SQUINT
     ProcedureReturn *node
   EndProcedure
   
-  Procedure SquintFree(*this.squint)  
+  Procedure SquintFree(*this.squint,*pfn.Squint_CBFree=0)  
     
   ;##################################################################################
   ;# Free Squint Trie 
@@ -411,7 +415,7 @@ Module SQUINT
       If *node\vertex
         _GETNODECOUNT()
         If (offset <> 15 Or nodecount = 16)
-          ISquintFree(*this,*node)
+          ISquintFree(*this,*node,*pfn)
         EndIf
       EndIf
     Next
