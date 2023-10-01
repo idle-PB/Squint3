@@ -151,13 +151,11 @@ Module SQUINT
   EndMacro
   
   Macro _GETNODECOUNT()
-    If *node\vertex
-      CompilerIf #PB_Compiler_32Bit 
-        nodecount = MemorySize(*node\vertex) / SizeOf(squint_node)
-      CompilerElse
-        nodecount = (*node\vertex >> 48)
-      CompilerEndIf
-    EndIf  
+     CompilerIf #PB_Compiler_32Bit 
+       nodecount = MemorySize(*node\vertex) / SizeOf(squint_node)
+     CompilerElse
+       nodecount = (*node\vertex >> 48)
+     CompilerEndIf
   EndMacro
   
   Macro _POKENHL(in,Index,Number)
@@ -525,8 +523,11 @@ Module SQUINT
       *node = *subtrie & #Squint_Pmask
     EndIf 
     _CONVERTUTF8()
-    While vchar
-     
+    
+    If *node\vertex
+      
+      While vchar
+                 
       If *this\write <> *node   ;dont step on same write node
         _lfence 
         offset = (*node\squint >> ((vchar & $f0) >> 2 )) & $f
@@ -561,6 +562,9 @@ Module SQUINT
       EndIf
        
     Wend
+    
+   EndIf 
+    
     *out = *node 
     offset = *node\squint & $f
     _GETNODECOUNT()
@@ -1188,8 +1192,8 @@ CompilerIf #PB_Compiler_IsMainFile
     
     OpenConsole()
     
-    #TestNumeric = 1
-    #TESTMAP =  0
+    #TestNumeric = 0
+    #TESTMAP =  1
     #Randomkeys = 1 
     
     Global lt = 1 << 22   
@@ -1210,7 +1214,7 @@ CompilerIf #PB_Compiler_IsMainFile
       End 
     EndIf  
     
-    ;RandomSeed(124)
+    RandomSeed(124)
     
     For a = 0 To lt 
       num = Random(lt) 
