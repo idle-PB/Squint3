@@ -12,20 +12,19 @@ Macro Comments()
   ; Squint is lexographicaly sorted so sorting is magnitudes faster than what you could achieve with a map list or unsorted array 
   ; Squint also supports collections or subtries, which facilitates tasks like in memory DB's  
   ; The Numeric mode of squint behaves like a map and is closer to 1:1 perfromace with a sized map 
-  ; and the gets are of course faster as they can bail out earlier on evaluation of the key
-  ;
+  ; 
   ; see https://en.wikipedia.org/wiki/Trie 
   ;     simillar structures   
   ;     https://dotat.at/prog/qp/blog-2015-10-04.html
   ;     https://cr.yp.to/critbit.html 
   ;
-  ; Squint supports Set, Get, Enum, Walk, Delete and Prune with a flag in Delete
-  ; keys can be Unicode, Ascii or UTF8 the type must be specified 
+  ; Squint supports Set, Get, Enum, EnumNode , Walk, WalkNode, Delete and Prune with a flag in Delete
+  ; String keys can be Unicode, Ascii or UTF8 the type must be specified 
   ; all string keys get mapped to UTF8 
   ;
   ; SquintNumeric supports, SetNumeric GetNumeric DeleteNumeric and WalkNumeric
-  ; it's provided as a direct subtitute for a numeric map
-  ; keys are returned as Integers  
+  ; it's provided as a direct subtitute for a numeric map, keys can be any size upto #SQUINT_MAX_KEY =1024
+  ; keys are returned as pointers   
   ;
   ; Note while you can mix string and numeric keys in the same trie it's not recomended unless you only require set and get 
   ;   ;
@@ -47,13 +46,13 @@ Macro Comments()
   ; LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT Or OTHERWISE, ARISING FROM,
   ; OUT OF Or IN CONNECTION With THE SOFTWARE Or THE USE Or OTHER DEALINGS IN THE
   ; SOFTWARE. 
-    
+  
 EndMacro 
 
 DeclareModule SQUINT 
   
   #SQUINT_MAX_KEY = 1024
-   
+  
   Structure squint_node Align #PB_Structure_AlignC
     *vertex.edge
     StructureUnion
@@ -62,7 +61,7 @@ DeclareModule SQUINT
     EndStructureUnion 
   EndStructure   
   
-  Structure edge    Align #PB_Structure_AlignC
+  Structure edge   Align #PB_Structure_AlignC
     e.squint_node[0]
   EndStructure 
   
@@ -151,11 +150,11 @@ Module SQUINT
   EndMacro
   
   Macro _GETNODECOUNT()
-     CompilerIf #PB_Compiler_32Bit 
-       nodecount = MemorySize(*node\vertex) / SizeOf(squint_node)
-     CompilerElse
-       nodecount = (*node\vertex >> 48)
-     CompilerEndIf
+    CompilerIf #PB_Compiler_32Bit 
+      nodecount = MemorySize(*node\vertex) / SizeOf(squint_node)
+    CompilerElse
+      nodecount = (*node\vertex >> 48)
+    CompilerEndIf
   EndMacro
   
   Macro _POKENHL(in,Index,Number)
@@ -167,11 +166,11 @@ Module SQUINT
       *Mem\a = (*Mem\a & $0f) | (Number << 4)
     EndIf
   EndMacro
-    
+  
   CompilerIf #PB_Compiler_Processor = #PB_Processor_x86 
     Macro rax : eax : EndMacro 
   CompilerEndIf   
-    
+  
   CompilerIf #PB_Compiler_Thread 
     Macro _LockMutex(mut) 
       LockMutex(mut) 
@@ -203,31 +202,31 @@ Module SQUINT
   EndMacro
   
   Global gEnumlock.i  
-   
+  
   Macro _gEnumlock(x)
-     CompilerIf #PB_Compiler_Backend = #PB_Backend_C 
-        !__atomic_exchange_n(&squintXg_genumlock,x,__ATOMIC_SEQ_CST) ; 
-     CompilerElse  
-        !mov rdx, x  
-        !xchg qword [squint.v_gEnumlock] , rdx
-     CompilerEndIf 
+    CompilerIf #PB_Compiler_Backend = #PB_Backend_C 
+      !__atomic_exchange_n(&squintXg_genumlock,x,__ATOMIC_SEQ_CST) ; 
+    CompilerElse  
+      !mov rdx, x  
+      !xchg qword [squint.v_gEnumlock] , rdx
+    CompilerEndIf 
   EndMacro 
   
- Macro _sfence
-   CompilerIf #PB_Compiler_Backend = #PB_Backend_Asm  
-     !sfence 
-   CompilerElse 
-     CompilerIf #PB_Compiler_Processor = #PB_Processor_Arm32 Or #PB_Compiler_Processor = #PB_Processor_Arm64
-       !__sync_synchronize();
-     CompilerElse   
-       !__asm__("sfence" ::: "memory");   
-     CompilerEndIf   
-   CompilerEndIf   
+  Macro _sfence
+    CompilerIf #PB_Compiler_Backend = #PB_Backend_Asm  
+      !sfence 
+    CompilerElse 
+      CompilerIf #PB_Compiler_Processor = #PB_Processor_Arm32 Or #PB_Compiler_Processor = #PB_Processor_Arm64
+        !__sync_synchronize();
+      CompilerElse   
+        !__asm__("sfence" ::: "memory");   
+      CompilerEndIf   
+    CompilerEndIf   
   EndMacro 
   
   Macro _lfence 
     CompilerIf #PB_Compiler_Backend = #PB_Backend_Asm   
-       ;!lfence
+      ;!lfence
     CompilerElse
       CompilerIf #PB_Compiler_Processor = #PB_Processor_Arm32 Or #PB_Compiler_Processor = #PB_Processor_Arm64 
         !__sync_synchronize();
@@ -252,34 +251,34 @@ Module SQUINT
         EndIf   
       CompilerElse  
         
-       !mov	eax, [p.v_vchar] 
-       !cmp eax, 0x80 
-       !jb .l2 
-       !cmp	eax, 0x0800
-	     !jae .l1
-	     !mov edx, eax 
-	     !sal	edx, 8
-	     !and	edx, 0x3f00 
-	     !sar	eax, 6
-	     !or	edx, eax
-	     !or  edx, 0x80C0 
-	     !mov eax,edx
-	     !jmp	.l2
-       !.l1:
-	     !mov edx, eax 
-	     !sal	edx, 16
-	     !and	edx, 0x3f0000
-	     !mov ecx, eax 
-	     !sal ecx, 2 
-	     !and ecx, 0x3f00
-	     !or  edx,ecx 
-	     !sar eax, 12 
-	     !or  edx, eax 
-	     !or  edx, 0x8080e0 
-	     !mov eax,edx 
-	     !.l2:
-       !mov	[p.v_vchar], eax  
-     
+        !mov	eax, [p.v_vchar] 
+        !cmp eax, 0x80 
+        !jb .l2 
+        !cmp	eax, 0x0800
+        !jae .l1
+        !mov edx, eax 
+        !sal	edx, 8
+        !and	edx, 0x3f00 
+        !sar	eax, 6
+        !or	edx, eax
+        !or  edx, 0x80C0 
+        !mov eax,edx
+        !jmp	.l2
+        !.l1:
+        !mov edx, eax 
+        !sal	edx, 16
+        !and	edx, 0x3f0000
+        !mov ecx, eax 
+        !sal ecx, 2 
+        !and ecx, 0x3f00
+        !or  edx,ecx 
+        !sar eax, 12 
+        !or  edx, eax 
+        !or  edx, 0x8080e0 
+        !mov eax,edx 
+        !.l2:
+        !mov	[p.v_vchar], eax  
+        
       CompilerEndIf    
       
     EndIf  
@@ -329,7 +328,7 @@ Module SQUINT
         *node = *node\Vertex\e[offset] & #Squint_Pmask
         
         FreeMemory(*old) 
-             
+        
         *this\size+SizeOf(squint_node) 
         
       EndIf 
@@ -355,8 +354,7 @@ Module SQUINT
   EndMacro
   
   ;-General functions 
-  Procedure SquintNew()
-    
+  
   ;##################################################################################
   ;# Create a new Squint Trie 
   ;#  
@@ -365,7 +363,8 @@ Module SQUINT
   ;#   or 
   ;#   global sq = SquintNew() or normal use      
   ;################################################################################## 
-    
+  
+  Procedure SquintNew()
     
     Protected *this.squint,a
     *this = AllocateMemory(SizeOf(squint))
@@ -404,13 +403,13 @@ Module SQUINT
     ProcedureReturn *node
   EndProcedure
   
-  Procedure SquintFree(*this.squint,*pfn.Squint_CBFree=0)  
-    
   ;##################################################################################
   ;# Free Squint Trie 
   ;# If you need to free your own pointers, Walk the trie 1st to free them  
   ;# then call sq\free() or SquintFree(sq)   
   ;################################################################################## 
+  
+  Procedure SquintFree(*this.squint,*pfn.Squint_CBFree=0)  
     
     Protected a,offset,*node.squint_node,nodecount
     *node = *this\root
@@ -429,10 +428,7 @@ Module SQUINT
     ProcedureReturn  nodecount  
   EndProcedure
   ;-string functions 
- 
-    
-  Procedure SquintSetNode(*this.squint,*subtrie,*key,value.i,mode=#PB_Unicode)
-    
+  
   ;#################################################################################
   ;#    Set a node from the root or from a previously set node   
   ;#    *this.squint instance from SquintNew() 
@@ -450,6 +446,8 @@ Module SQUINT
   ;# via interface  
   ;#     sq\set(*toyota,@"Cameray",202)                   the key = "cars:toyota:Cameray"   
   ;################################################################################## 
+  
+  Procedure SquintSetNode(*this.squint,*subtrie,*key,value.i,mode=#PB_Unicode)
     
     Protected *node.squint_node,idx,offset,nodecount,vchar.l,vret.l,count,*out
     Protected *new.squint_node,*old,*adr 
@@ -483,7 +481,7 @@ Module SQUINT
     *out = *node 
     offset = *node\squint & $f
     _SETNODE()
-       
+    
     *this\write = 0    ;<----------------------------------Clear the write flag     
     
     *this\count+1 
@@ -493,27 +491,28 @@ Module SQUINT
     If value 
       *node\value = value
     EndIf 
-   
+    
     ProcedureReturn *out
-      
+    
   EndProcedure
   
+  
+  ;##################################################################################
+  ;#    Get a node from the root or from a previously stored node aka subtrie    
+  ;#    *this.squint instance from SquintNew() 
+  ;#    *subtrie 0 Or the addess of a previously stored node retuned from this function 
+  ;#   *key   address of a null terminated string can be unicode ascii or UTF8
+  ;#    mode.i  Desired key format #PB_Uniocde, #PB_Ascii, #PB_UTF8  
+  ;#    
+  ;#  returns the value or subnode        
+  ;#  example    
+  ;#     x = squintGetNode(sq,0,@"cars:toyota:")   subtrie = root, the key = "cars:toyota"  
+  ;#     x = squintGetNode(sq,*toyota,@"Corolla")  subtrie = *toyota the key evaluates to = "cars:toyota:corolla"   
+  ;#     or via interface 
+  ;#     x = sq\get(0,@"cars:toyota:")  subtrie = root, the key = "cars:toyota"    
+  ;################################################################################## 
+  
   Procedure SquintGetNode(*this.squint,*subtrie,*key,mode=#PB_Unicode,bval=1)
-    
-    ;##################################################################################
-    ;#    Get a node from the root or from a previously stored node aka subtrie    
-    ;#    *this.squint instance from SquintNew() 
-    ;#    *subtrie 0 Or the addess of a previously stored node retuned from this function 
-    ;#   *key   address of a null terminated string can be unicode ascii or UTF8
-    ;#    mode.i  Desired key format #PB_Uniocde, #PB_Ascii, #PB_UTF8  
-    ;#    
-    ;#  returns the value or subnode        
-    ;#  example    
-    ;#     x = squintGetNode(sq,0,@"cars:toyota:")   subtrie = root, the key = "cars:toyota"  
-    ;#     x = squintGetNode(sq,*toyota,@"Corolla")  subtrie = *toyota the key evaluates to = "cars:toyota:corolla"   
-    ;#     or via interface 
-    ;#     x = sq\get(0,@"cars:toyota:")  subtrie = root, the key = "cars:toyota"    
-    ;################################################################################## 
     
     Protected *node.squint_Node,idx,offset,nodecount,vchar.l,vret.l,count,*out
     
@@ -575,15 +574,13 @@ Module SQUINT
           ProcedureReturn *out  
         EndIf   
       Else
-         ProcedureReturn 0
+        ProcedureReturn 0
       EndIf
       
     EndIf 
     
   EndProcedure 
   
-  Procedure SquintDeleteNode(*this.squint,*subtrie,*key.Unicode,prune=0,mode=#PB_Unicode)
-    
   ;##################################################################################
   ;#    Resets a keys value to 0 or deletes the childen of the node freeing up memory     
   ;#    *this.squint instance from SquintNew() 
@@ -597,7 +594,8 @@ Module SQUINT
   ;#    via inteface  
   ;#    sq\delete(0,@"cars:toyota:corolla")     
   ;################################################################################## 
-         
+  
+  Procedure SquintDeleteNode(*this.squint,*subtrie,*key.Unicode,prune=0,mode=#PB_Unicode)
     
     Protected *node.squint_node,idx,*mem.Character,offset,nodecount,vchar.l,vret.l,count,*out
     If *subtrie = 0
@@ -652,7 +650,7 @@ Module SQUINT
     EndIf
   EndProcedure
   
- Procedure IEnum(*this.squint,*node.squint_Node,depth,*pfn.squint_CB,*outkey,*userdata=0)
+  Procedure IEnum(*this.squint,*node.squint_Node,depth,*pfn.squint_CB,*outkey,*userdata=0)
     Protected a.i,offset,nodecount,*mem.Ascii 
     
     If Not *node
@@ -666,9 +664,9 @@ Module SQUINT
         _GETNODECOUNT()
         If (offset <> 15 Or nodecount = 16)
           _POKENHL(*outkey,depth,a)
-         If IEnum(*this,*node\Vertex\e[offset] & #Squint_Pmask,depth+1,*pfn,*outkey,*userdata) = 0 
-           Break 
-         EndIf  
+          If IEnum(*this,*node\Vertex\e[offset] & #Squint_Pmask,depth+1,*pfn,*outkey,*userdata) = 0 
+            Break 
+          EndIf  
         EndIf
         
       EndIf
@@ -685,9 +683,7 @@ Module SQUINT
     ProcedureReturn *node
     
   EndProcedure
-   
-  Procedure SquintEnumNode(*this.squint,*subtrie,*key,*pfn.squint_CB,*userdata=0,mode=#PB_Unicode)
-    
+  
   ;##################################################################################
   ;#  Enumerates the Trie from a given key   
   ;#    *this.squint instance from SquintNew() 
@@ -701,11 +697,12 @@ Module SQUINT
   ;#  or via interface 
   ;#     sq\Enum@"cars:toyota:",@MyCallback())   
   ;################################################################################## 
-       
+  
+  Procedure SquintEnumNode(*this.squint,*subtrie,*key,*pfn.squint_CB,*userdata=0,mode=#PB_Unicode)  
     
     Protected *node.squint_Node,idx,*mem.Ascii,offset,nodecount,depth,vchar.l,vret.l,count,*out
     Protected outkey.s{1024} 
-        
+    
     _LockMutex(gwrite) 
     
     If *subtrie = 0
@@ -713,35 +710,35 @@ Module SQUINT
     Else
       *node = *subtrie  & #Squint_Pmask 
     EndIf 
-  
+    
     _CONVERTUTF8()
     
     While vchar 
-         
-        offset = (*node\squint >> ((vchar & $f0) >> 2 )) & $f
-        _GETNODECOUNT()
-        If offset < nodecount
-           *mem = @outkey+(depth>>1) 
-           *mem\a = (*mem\a & $0f) | (((vchar >> 4) & $f)<<4)
-           depth+1
-           *node = (*node\Vertex\e[offset] & #Squint_Pmask)
-        Else
-           _UnlockMutex(gwrite) 
-            ProcedureReturn 0
-        EndIf
-     
-        offset = (*node\squint >> ((vchar & $0f) << 2)) & $f
-        _GETNODECOUNT()
-        If offset < nodecount
-           *mem = @outkey+(depth>>1) 
-           *Mem\a = ((*Mem\a & $f0) | (vchar & $f))
-           depth+1
-          *node = (*node\Vertex\e[offset] & #Squint_Pmask)
-        Else
-           _UnlockMutex(gwrite) 
-            ProcedureReturn 0
-        EndIf
-     
+      
+      offset = (*node\squint >> ((vchar & $f0) >> 2 )) & $f
+      _GETNODECOUNT()
+      If offset < nodecount
+        *mem = @outkey+(depth>>1) 
+        *mem\a = (*mem\a & $0f) | (((vchar >> 4) & $f)<<4)
+        depth+1
+        *node = (*node\Vertex\e[offset] & #Squint_Pmask)
+      Else
+        _UnlockMutex(gwrite) 
+        ProcedureReturn 0
+      EndIf
+      
+      offset = (*node\squint >> ((vchar & $0f) << 2)) & $f
+      _GETNODECOUNT()
+      If offset < nodecount
+        *mem = @outkey+(depth>>1) 
+        *Mem\a = ((*Mem\a & $f0) | (vchar & $f))
+        depth+1
+        *node = (*node\Vertex\e[offset] & #Squint_Pmask)
+      Else
+        _UnlockMutex(gwrite) 
+        ProcedureReturn 0
+      EndIf
+      
       vchar >> 8
       count+1
       If vchar = 0
@@ -749,15 +746,13 @@ Module SQUINT
         _MODECHECK()
       EndIf
     Wend
-     
+    
     IEnum(*this,*node,depth,*pfn,@outkey,*userdata)
-
-     _UnlockMutex(gwrite) 
+    
+    _UnlockMutex(gwrite) 
     
   EndProcedure
   
-  Procedure SquintEnum(*this.squint,*key,*pfn.squint_CB,*userdata=0,mode=#PB_Unicode)
-    
   ;##################################################################################
   ;#  Enumerates the Trie from a given key   
   ;#    *this.squint instance from SquintNew() 
@@ -770,13 +765,13 @@ Module SQUINT
   ;#  or via interface 
   ;#     sq\Enum@"cars:toyota:",@MyCallback())   
   ;################################################################################## 
+  
+  Procedure SquintEnum(*this.squint,*key,*pfn.squint_CB,*userdata=0,mode=#PB_Unicode)
     
-   SquintEnumNode(*this,0,*key,*pfn,*userdata,mode) 
+    SquintEnumNode(*this,0,*key,*pfn,*userdata,mode) 
     
   EndProcedure   
-   
-  Procedure SquintWalk(*this.squint,*pfn.squint_CB,*userdata=0) 
-    
+  
   ;##################################################################################
   ;# Walks the entire trie    
   ;#    *this.squint instance from SquintNew() 
@@ -787,20 +782,19 @@ Module SQUINT
   ;#  or via interface 
   ;#     sq\Walk(@MyCallback())   
   ;################################################################################## 
-    
+  
+  Procedure SquintWalk(*this.squint,*pfn.squint_CB,*userdata=0) 
     
     Protected outkey.s{#SQUINT_MAX_KEY} 
     
     _LockMutex(gwrite) 
-     
+    
     IEnum(*this,*this\root,0,*pfn,@outkey,*userdata)
     
     _unLockMutex(gwrite)
     
   EndProcedure
   
-  Procedure SquintWalkNode(*this.squint,*subtrie,*pfn.squint_CB,*userdata=0) 
-    
   ;##################################################################################
   ;# Walks from a subtrie    
   ;#    *this.squint instance from SquintNew() 
@@ -812,12 +806,13 @@ Module SQUINT
   ;#  or via interface 
   ;#     sq\Walk(*cars,@MyCallback())   
   ;################################################################################## 
-        
+  
+  Procedure SquintWalkNode(*this.squint,*subtrie,*pfn.squint_CB,*userdata=0)   
     
     Protected *node, outkey.s{#SQUINT_MAX_KEY}    
     
-     _LockMutex(gwrite) 
-       
+    _LockMutex(gwrite) 
+    
     If *subtrie = 0
       *node = *this\root
     Else
@@ -825,8 +820,8 @@ Module SQUINT
     EndIf 
     IEnum(*this,*node,0,*pfn,@outkey,*userdata)
     
-     _unLockMutex(gwrite)
-   
+    _unLockMutex(gwrite)
+    
   EndProcedure
   
   Procedure SquintSize(*this.squint) 
@@ -837,12 +832,8 @@ Module SQUINT
     ProcedureReturn *this\count 
   EndProcedure   
   
-  ;-Numeric functions 
-  ; Numeric functions operate the same as a map 
-  ; keys can be anything that's serial  
+  ;-Numeric functions operate the same as a map, keys can be anything that's serial  
   
-  Procedure SquintSetNumeric(*this.squint,*key,value.i,size=#Squint_Integer)
-    
   ;#################################################################################
   ;#    Set a numeric key  
   ;#    note you can use both numeric or string keys in the same trie  
@@ -862,7 +853,8 @@ Module SQUINT
   ;#  via interface  
   ;#     sq\setNumeric(@ikey,123435,4)    
   ;################################################################################## 
-    
+  
+  Procedure SquintSetNumeric(*this.squint,*key,value.i,size=#Squint_Integer)
     
     Protected *node.squint_node,idx,offset,nodecount,vchar.i,vret.i,count 
     Protected *old,*new,*adr,*akey.Ascii 
@@ -884,15 +876,14 @@ Module SQUINT
       count+1
     Wend
     
-     _UnlockMutex(gwrite) 
+    _UnlockMutex(gwrite) 
     *this\write = 0    
     
     *node\value = value
-   
+    
   EndProcedure
   
-  Procedure SquintGetNumeric(*this.squint,*key,size=#Squint_Integer)
-    
+  
   ;##################################################################################
   ;#    Get a numeric node     
   ;#    *this.squint instance from SquintNew() 
@@ -905,48 +896,47 @@ Module SQUINT
   ;#     or via interface 
   ;#     x = sq\get(@ikey,4)      
   ;################################################################################## 
-    
+  
+  Procedure SquintGetNumeric(*this.squint,*key,size=#Squint_Integer)
     
     Protected *node.squint_Node,idx,offset,nodecount,vchar.i,vret.i,count,*akey.Ascii 
     *node = *this\root & #Squint_Pmask
     *akey = *key
     
     While count <= size  
-     
+      
       If *this\write <> *node   ;test to see if same as write node
         _lfence 
-      offset = (*node\squint >> ((*akey\a & $f0) >> 2 )) & $f
-      _GETNODECOUNT()
-      If offset < nodecount
-        *node = (*node\Vertex\e[offset] & #Squint_Pmask)
-      Else
-        ProcedureReturn 0
-      EndIf
+        offset = (*node\squint >> ((*akey\a & $f0) >> 2 )) & $f
+        _GETNODECOUNT()
+        If offset < nodecount
+          *node = (*node\Vertex\e[offset] & #Squint_Pmask)
+        Else
+          ProcedureReturn 0
+        EndIf
       Else 
         Continue 
       EndIf  
       
       If *this\write <> *node   ;test to see if same as write node
         _lfence 
-       offset = (*node\squint >> ((*akey\a & $0f) << 2)) & $f
-      _GETNODECOUNT()
-       If offset < nodecount
-        *node = (*node\Vertex\e[offset] & #Squint_Pmask)
-      Else
-        ProcedureReturn 0
-      EndIf
+        offset = (*node\squint >> ((*akey\a & $0f) << 2)) & $f
+        _GETNODECOUNT()
+        If offset < nodecount
+          *node = (*node\Vertex\e[offset] & #Squint_Pmask)
+        Else
+          ProcedureReturn 0
+        EndIf
       Else 
         Continue 
       EndIf  
-       *akey+1
-       count+1
+      *akey+1
+      count+1
     Wend
     
     ProcedureReturn *node\value
   EndProcedure
   
-   Procedure SquintDeleteNumeric(*this.squint,*key,size=#Squint_Integer) 
-     
   ;##################################################################################
   ;#  Delete Numeric resets the keys value to 0      
   ;#    *this.squint instance from SquintNew() 
@@ -958,12 +948,13 @@ Module SQUINT
   ;#     or via interface 
   ;#     x = sq\DeleteNumeric(@ikey,4)      
   ;################################################################################## 
-        
-     Protected *node.squint_node,idx,*mem.Character,offset,nodecount,vchar.i,vret.i,count,*akey.Ascii 
+  
+  Procedure SquintDeleteNumeric(*this.squint,*key,size=#Squint_Integer)    
+    Protected *node.squint_node,idx,*mem.Character,offset,nodecount,vchar.i,vret.i,count,*akey.Ascii 
     *node = *this\root & #Squint_Pmask
     *akey = *key
     
-     While count <= size 
+    While count <= size 
       offset = (*node\squint >> ((*akey\a & $f0) >> 2 )) & $f
       _GETNODECOUNT()
       If offset < nodecount
@@ -985,7 +976,7 @@ Module SQUINT
       *node\squint = 0
     EndIf
   EndProcedure
-    
+  
   Procedure IEnumNumeric(*this.squint,*node.squint_Node,idx,depth,*pfn.squint_CB,*userdata=0)
     Protected a.i,offset,nodecount,*mem.Ascii,vchar.i,vret.i 
     If Not *node
@@ -1010,8 +1001,6 @@ Module SQUINT
     ProcedureReturn *node
   EndProcedure
   
-  Procedure SquintWalkNumeric(*this.squint,*pfn.squint_CB,*userdata=0) 
-    
   ;##################################################################################
   ;# Walks whole trie. note it's not thread safe yet you can only walk one thread at a time with same trie    
   ;#    *this.squint instance from SquintNew() 
@@ -1022,7 +1011,8 @@ Module SQUINT
   ;#  or via interface 
   ;#     sq\WalkNumeric(@MyCallback())   
   ;################################################################################## 
-        
+  
+  Procedure SquintWalkNumeric(*this.squint,*pfn.squint_CB,*userdata=0)       
     _LockMutex(gwrite) 
     
     IEnumNumeric(*this,*this\root,0,0,*pfn,*userdata)
@@ -1043,16 +1033,16 @@ CompilerIf #PB_Compiler_IsMainFile
     If *value 
       PrintN(sout + " " + Str(*value))
     EndIf 
-       
+    
   EndProcedure
   
   Procedure CBSquintWalk(*key,value,*userData)
     Static ct 
     If ct < 1000
-    If value     
-       PrintN(Str(PeekI(*key)) + " " + Str(value))  
-     EndIf
-     ct+1 
+      If value     
+        PrintN(Str(PeekI(*key)) + " " + Str(value))  
+      EndIf
+      ct+1 
     EndIf  
   EndProcedure
   
@@ -1061,7 +1051,7 @@ CompilerIf #PB_Compiler_IsMainFile
   
   Global sq.isquint = SquintNew()
   Global *key,key.s,SubTrieA,SubTrie_B,val   
-   
+  
   
   CompilerIf #PB_Compiler_Debugger 
     
@@ -1070,7 +1060,7 @@ CompilerIf #PB_Compiler_IsMainFile
     ;test with interface  
     ;key = "subtrieA:"                ;create a subtrie called subtrie_a_ 
     SubTrieA = sq\Set(0,@"subtrieA:",123)    ;Set it with utf8 flag it returns the root of the sub trie 
-   
+    
     key = "abc"                                
     sq\Set(SubTrieA,@key,1)          ;key evaluates as subtrieA:abc  to the sub trie  
     
@@ -1079,10 +1069,10 @@ CompilerIf #PB_Compiler_IsMainFile
     
     *key = UTF8("utf8:" + Chr($20AC) + Chr($A9))  
     sq\Set(SubTrieA,*key,2,#PB_UTF8) ;add it to the sub trie with utf8 key  
-           
+    
     key.s = "unicode:" + Chr($20AC) + Chr($A9)  
     sq\Set(SubTrieA,@key,3) ;add it to the sub trie with utf8 key 
-      
+    
     *key = Ascii("cde") 
     sq\set(SubTrieA,*key,4,#PB_Ascii) ;add to sub trie with ascii key    
     
@@ -1132,7 +1122,7 @@ CompilerIf #PB_Compiler_IsMainFile
     
     key = "subtrie_c"
     sq\Enum(@key,@CBSquint())     
-        
+    
     PrintN("++++dump subtrie_a ++++++++")
     SquintWalkNode(sq,SubTrieA,@CBSquint())  ;returns the sub keys of SubTrie_A   
     
@@ -1155,9 +1145,9 @@ CompilerIf #PB_Compiler_IsMainFile
     sq\WalkNumeric(@CBSquintWalk())           ;walk the numeric thery return in sorted order     
     
     sq\Free() 
-            
+    
     Procedure CBSquintWalkNum(*key.Integer,value,*userData)
-       PrintN(Str(*key\i) + " " + Str(value))  
+      PrintN(Str(*key\i) + " " + Str(value))  
     EndProcedure
     
     sq.isquint = SquintNew()
@@ -1190,8 +1180,8 @@ CompilerIf #PB_Compiler_IsMainFile
     
     OpenConsole()
     
-    #TestNumeric = 0
-    #TESTMAP =  1
+    #TestNumeric = 1
+    #TESTMAP =  0
     #Randomkeys = 1 
     
     Global lt = 1 << 22   
@@ -1218,13 +1208,13 @@ CompilerIf #PB_Compiler_IsMainFile
       num = Random(lt) 
       key = Hex(num);
       CompilerIf #TestNumeric 
-         CompilerIf #TESTMAP = 0
-           keylen+4 
-         CompilerElse 
-           keylen + StringByteLength(Str(num))
-         CompilerEndIf 
-         sq\SetNumeric(@num,1,4) 
-         mp(Str(num))=1 
+        CompilerIf #TESTMAP = 0
+          keylen+4 
+        CompilerElse 
+          keylen + StringByteLength(Str(num))
+        CompilerEndIf 
+        sq\SetNumeric(@num,1,4) 
+        mp(Str(num))=1 
       CompilerElse   
         keylen+StringByteLength(key) 
         sq\Set(0,@key,1)
@@ -1239,11 +1229,11 @@ CompilerIf #PB_Compiler_IsMainFile
     CompilerEndIf  
     
     CompilerIf #TESTMAP = 0 
-        memsize = SquintSize(sq)
+      memsize = SquintSize(sq)
     CompilerElse     
-        memsize = (lt*SizeOf(Integer)*2) + keylen  ;at minimum a map uses two pointer per bin value and the key              
+      memsize = (lt*SizeOf(Integer)*2) + keylen  ;at minimum a map uses two pointer per bin value and the key              
     CompilerEndIf 
-              
+    
     Procedure _Read(*ct.integer) 
       Protected key.s,num.i,ct,x=0,cx=0  
       
@@ -1252,11 +1242,11 @@ CompilerIf #PB_Compiler_IsMainFile
       Repeat 
         
         CompilerIf #Randomkeys  
-           num = Random($ffffffff,1) ;key's may not exist 
+          num = Random($ffffffff,1) ;key's may not exist 
         CompilerElse   
-           num = Random(lt,1) ;keys most likely exist 
+          num = Random(lt,1) ;keys most likely exist 
         CompilerEndIf    
-           
+        
         CompilerIf #TESTMAP = 0
           CompilerIf #TestNumeric  
             x = SquintGetNumeric(sq,@num,4)
@@ -1334,26 +1324,26 @@ CompilerIf #PB_Compiler_IsMainFile
             PrintN(MapKey(mp()))
           CompilerEndIf  
         CompilerElse 
-           CompilerIf #TESTMAP = 0  
-             sq\WalkNumeric(@CBSquintWalk())   
-           CompilerElse 
-             While ct < 1000  
-               x = mp(Str(ct1)) 
-               If x <> 0 
-                 PrintN(Str(ct1) + " " + Str(x))
-                 ct+1
-               EndIf   
+          CompilerIf #TESTMAP = 0  
+            sq\WalkNumeric(@CBSquintWalk())   
+          CompilerElse 
+            While ct < 1000  
+              x = mp(Str(ct1)) 
+              If x <> 0 
+                PrintN(Str(ct1) + " " + Str(x))
+                ct+1
+              EndIf   
               ct1 + 1 
-             Wend     
-           CompilerEndIf   
+            Wend     
+          CompilerEndIf   
         CompilerEndIf  
-               
+        
         Delay(10) 
         
       Until gQuit   
       
     EndProcedure   
-        
+    
     Global Dim counts(NUMTHREADS) 
     Global Dim threads(NUMTHREADS) 
     
@@ -1363,13 +1353,13 @@ CompilerIf #PB_Compiler_IsMainFile
     Threads(a) = CreateThread(@_write(),@counts(a)) 
     ;a+1
     ;Threads(a) = CreateThread(@_Enum(),0) 
-        
+    
     Delay(1000) 
     
     For a = 0 To NUMTHREADS-1 
       SignalSemaphore(start)
     Next  
-           
+    
     Delay(1000) 
     
     gquit=1 
@@ -1379,14 +1369,14 @@ CompilerIf #PB_Compiler_IsMainFile
     Next 
     
     Global out.s, total, avg, tout.s  
-     For a = 0 To NUMTHREADS-2;
-       total + counts(a)  
-       tout + " thread " + Str(a) + " " +  FormatNumber(counts(a),0,".",",") + #CRLF$
-     Next 
-     tout + " thread " + Str(a) + " " +  FormatNumber(counts(a),0,".",",") + #CRLF$
-     
-     avg = (total / (NUMTHREADS-1))
-     
+    For a = 0 To NUMTHREADS-2;
+      total + counts(a)  
+      tout + " thread " + Str(a) + " " +  FormatNumber(counts(a),0,".",",") + #CRLF$
+    Next 
+    tout + " thread " + Str(a) + " " +  FormatNumber(counts(a),0,".",",") + #CRLF$
+    
+    avg = (total / (NUMTHREADS-1))
+    
     CompilerIf  #TESTMAP
       out +  "Map lookup " + "items " + FormatNumber(total,0) + "  p/s " +  " avg per thread " + FormatNumber(avg,0) +  #CRLF$
       out +  "lookup rate " + FormatNumber(total*avgkeylen/1024/1024,2,".",",") + " mb p/s"  + #CRLF$
@@ -1401,7 +1391,7 @@ CompilerIf #PB_Compiler_IsMainFile
         out +  "lookup time " + FormatNumber((1000.0/total)*1000000 ,2,".",",") + " ns"  + #CRLF$
         out +  "Squint Numeric writes items " + FormatNumber(counts(NUMTHREADS-1),0)  + #CRLF$
         out +  "Write rate " +  FormatNumber(counts(NUMTHREADS-1)*avgkeylen/1024/1024,2,".",",") + " mb p/s"  + #CRLF$
-     CompilerElse   
+      CompilerElse   
         out +  "Squint lookup items " + FormatNumber(total,0) + " p/s" + " avg per thread " + FormatNumber(avg,0) + #CRLF$
         out +  "lookup rate " + FormatNumber(total*avgkeylen/1024/1024,2,".",",") + " mb p/s"  + #CRLF$
         out +  "lookup time " + FormatNumber((1000.0/total)*1000000 ,2,".",",") + " ns"  + #CRLF$
@@ -1411,13 +1401,13 @@ CompilerIf #PB_Compiler_IsMainFile
       out +  "num items " + FormatNumber(lt,0,".",",") + " mem " + StrF(sq\Size() / (1024*1024),2) + "mb keysize " + StrF(keylen/(1024*1024),2) + " mb"  + #CRLF$     
       
     CompilerEndIf 
-        
+    
     out + tout 
     Print(out) 
     
     SetClipboardText(out)
     MessageRequester("threads",out) 
-      
+    
   CompilerEndIf  
   
 CompilerEndIf   
