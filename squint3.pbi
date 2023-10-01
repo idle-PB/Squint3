@@ -2,7 +2,7 @@
 Macro Comments() 
   ; SQUINT 3, Sparse Quad Union Indexed Nibble Trie
   ; Copyright Andrew Ferguson aka Idle (c) 2020 - 2023 
-  ; Version 3.1.3
+  ; Version 3.1.3b
   ; PB 5.72-6.02b 32bit/64bit asm and c backends for Windows,Mac OSX,Linux,PI,M1
   ; Thanks Wilbert for the high low insight and utf8 conversion help.
   ; Squint is a compact prefix Trie indexed by nibbles into a sparse array with performance metrics close to a map
@@ -500,21 +500,21 @@ Module SQUINT
   
   Procedure SquintGetNode(*this.squint,*subtrie,*key,mode=#PB_Unicode,bval=1)
     
-  ;##################################################################################
-  ;#    Get a node from the root or from a previously stored node aka subtrie    
-  ;#    *this.squint instance from SquintNew() 
-  ;#    *subtrie 0 Or the addess of a previously stored node retuned from this function 
-  ;#   *key   address of a null terminated string can be unicode ascii or UTF8
-  ;#    mode.i  Desired key format #PB_Uniocde, #PB_Ascii, #PB_UTF8  
-  ;#    
-  ;#  returns the value or subnode        
-  ;#  example    
-  ;#     x = squintGetNode(sq,0,@"cars:toyota:")   subtrie = root, the key = "cars:toyota"  
-  ;#     x = squintGetNode(sq,*toyota,@"Corolla")  subtrie = *toyota the key evaluates to = "cars:toyota:corolla"   
-  ;#     or via interface 
-  ;#     x = sq\get(0,@"cars:toyota:")  subtrie = root, the key = "cars:toyota"    
-  ;################################################################################## 
-        
+    ;##################################################################################
+    ;#    Get a node from the root or from a previously stored node aka subtrie    
+    ;#    *this.squint instance from SquintNew() 
+    ;#    *subtrie 0 Or the addess of a previously stored node retuned from this function 
+    ;#   *key   address of a null terminated string can be unicode ascii or UTF8
+    ;#    mode.i  Desired key format #PB_Uniocde, #PB_Ascii, #PB_UTF8  
+    ;#    
+    ;#  returns the value or subnode        
+    ;#  example    
+    ;#     x = squintGetNode(sq,0,@"cars:toyota:")   subtrie = root, the key = "cars:toyota"  
+    ;#     x = squintGetNode(sq,*toyota,@"Corolla")  subtrie = *toyota the key evaluates to = "cars:toyota:corolla"   
+    ;#     or via interface 
+    ;#     x = sq\get(0,@"cars:toyota:")  subtrie = root, the key = "cars:toyota"    
+    ;################################################################################## 
+    
     Protected *node.squint_Node,idx,offset,nodecount,vchar.l,vret.l,count,*out
     
     If *subtrie = 0
@@ -527,60 +527,58 @@ Module SQUINT
     If *node\vertex
       
       While vchar
-                 
-      If *this\write <> *node   ;dont step on same write node
-        _lfence 
-        offset = (*node\squint >> ((vchar & $f0) >> 2 )) & $f
-        _GETNODECOUNT()
-        If offset < nodecount
-          *node = (*node\Vertex\e[offset] & #Squint_Pmask)
-        Else
-          ProcedureReturn 0
+        
+        If *this\write <> *node   ;dont step on same write node
+          _lfence 
+          offset = (*node\squint >> ((vchar & $f0) >> 2 )) & $f
+          _GETNODECOUNT()
+          If offset < nodecount
+            *node = (*node\Vertex\e[offset] & #Squint_Pmask)
+          Else
+            ProcedureReturn 0
+          EndIf
+        Else 
+          Continue 
+        EndIf  
+        
+        If *this\write <> *node  ;dont step on same write node
+          _lfence 
+          offset = (*node\squint >> ((vchar & $0f) << 2)) & $f
+          _GETNODECOUNT()
+          If offset < nodecount
+            *node = (*node\Vertex\e[offset] & #Squint_Pmask)
+          Else
+            ProcedureReturn 0
+          EndIf
+        Else 
+          Continue 
+        EndIf 
+        
+        vchar >> 8
+        count+1
+        If vchar = 0
+          *key+2
+          _MODECHECK()
         EndIf
-      Else 
-        Continue 
-      EndIf  
+        
+      Wend
       
-      If *this\write <> *node  ;dont step on same write node
-        _lfence 
-        offset = (*node\squint >> ((vchar & $0f) << 2)) & $f
-        _GETNODECOUNT()
-        If offset < nodecount
-          *node = (*node\Vertex\e[offset] & #Squint_Pmask)
-        Else
-          ProcedureReturn 0
-        EndIf
-      Else 
-        Continue 
-      EndIf 
+      *out = *node 
+      offset = *node\squint & $f
+      _GETNODECOUNT()
       
-      vchar >> 8
-      count+1
-      If vchar = 0
-        *key+2
-        _MODECHECK()
+      If offset <= nodecount
+        *node = (*node\Vertex\e[offset] & #Squint_Pmask)
+        If bval 
+          ProcedureReturn *node\value
+        Else 
+          ProcedureReturn *out  
+        EndIf   
+      Else
+         ProcedureReturn 0
       EndIf
-       
-    Wend
-    
-   EndIf 
-    
-    *out = *node 
-    offset = *node\squint & $f
-    _GETNODECOUNT()
-    
-    If offset <= nodecount
-      *node = (*node\Vertex\e[offset] & #Squint_Pmask)
       
-      If bval 
-        ProcedureReturn *node\value
-      Else 
-        ProcedureReturn *out  
-      EndIf   
-     Else
-      
-      ProcedureReturn 0
-    EndIf
+    EndIf 
     
   EndProcedure 
   
