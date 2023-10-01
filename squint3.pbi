@@ -2,7 +2,7 @@
 Macro Comments() 
   ; SQUINT 3, Sparse Quad Union Indexed Nibble Trie
   ; Copyright Andrew Ferguson aka Idle (c) 2020 - 2023 
-  ; Version 3.1.2
+  ; Version 3.1.3
   ; PB 5.72-6.02b 32bit/64bit asm and c backends for Windows,Mac OSX,Linux,PI,M1
   ; Thanks Wilbert for the high low insight and utf8 conversion help.
   ; Squint is a compact prefix Trie indexed by nibbles into a sparse array with performance metrics close to a map
@@ -151,11 +151,13 @@ Module SQUINT
   EndMacro
   
   Macro _GETNODECOUNT()
-   CompilerIf #PB_Compiler_32Bit 
-      nodecount = MemorySize(*node\vertex) / SizeOf(squint_node)
-    CompilerElse
-      nodecount = (*node\vertex >> 48)
-    CompilerEndIf
+    If *node\vertex
+      CompilerIf #PB_Compiler_32Bit 
+        nodecount = MemorySize(*node\vertex) / SizeOf(squint_node)
+      CompilerElse
+        nodecount = (*node\vertex >> 48)
+      CompilerEndIf
+    EndIf  
   EndMacro
   
   Macro _POKENHL(in,Index,Number)
@@ -1075,7 +1077,7 @@ CompilerIf #PB_Compiler_IsMainFile
     
     *key = UTF8("utf8:" + Chr($20AC) + Chr($A9))  
     sq\Set(SubTrieA,*key,2,#PB_UTF8) ;add it to the sub trie with utf8 key  
-    
+           
     key.s = "unicode:" + Chr($20AC) + Chr($A9)  
     sq\Set(SubTrieA,@key,3) ;add it to the sub trie with utf8 key 
       
