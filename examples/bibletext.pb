@@ -67,9 +67,9 @@ If fn
   sq\Walk(0,@CBList())            ;dumps the dictionary      
     
   Repeat 
-    PrintN("enter a key to search for eg " + #DQUOTE$ + "ba" + #DQUOTE$ + " or type quit To End")   
+    PrintN("enter a key to search for eg " + #DQUOTE$ + "ba" + #DQUOTE$ + " or type quit To end")   
     key = LCase(Input())    
-    If key <> "quit" Or key <> "end" 
+    If (key <> "quit" And key <> "end") 
        sq\Enum(@key,@CBSearch())        ;search the dictionary 
     Else 
       Break 
