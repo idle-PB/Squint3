@@ -1,6 +1,7 @@
 ![SQUINT3 Version][badge squint]&nbsp;&nbsp;
 ![PureBasic Version][badge purebasic]&nbsp;&nbsp;
 [![MIT License][badge license]](./LICENSE)&nbsp;&nbsp;
+![GitHub all releases](https://img.shields.io/github/downloads/idle-PB/Squint3/total);&nbsp;&nbsp;
 
 # SQUINT3 (Sparse Quad Union Indexed Nibble Trie)
 
