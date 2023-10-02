@@ -65,10 +65,9 @@ If fn
   Until Eof(fn) 
   
   sq\Walk(0,@CBList())            ;dumps the dictionary      
-  PrintN("Search for ba") 
-  
+    
   Repeat 
-    PrintN("enter a key to search for of type quit to end")   
+    PrintN("enter a key to search for eg " + #DQUOTE$ + "ba" + #DQUOTE$ + " or type quit To End")   
     key = LCase(Input())    
     If key <> "quit" Or key <> "end" 
        sq\Enum(@key,@CBSearch())        ;search the dictionary 
