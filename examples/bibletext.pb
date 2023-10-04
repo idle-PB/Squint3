@@ -1,7 +1,7 @@
 ﻿;an example of scaning a text file to build a dictionary 
 ;to display it in sorted order and search for an item 
 
-XIncludeFile "..\squint3.pbi"
+XIncludeFile "../squint3.pbi"
 
 UseModule SQUINT
 
