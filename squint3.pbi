@@ -2,7 +2,7 @@
 Macro Comments() 
   ; SQUINT 3, Sparse Quad Union Indexed Nibble Trie
   ; Copyright Andrew Ferguson aka Idle (c) 2020 - 2023 
-  ; Version 3.1.3b
+  ; Version 3.1.4b
   ; PB 5.72-6.02b 32bit/64bit asm and c backends for Windows,Mac OSX,Linux,PI,M1
   ; Thanks Wilbert for the high low insight and utf8 conversion help.
   ; Squint is a compact prefix Trie indexed by nibbles into a sparse array with performance metrics close to a map
@@ -394,7 +394,9 @@ Module SQUINT
     If *node\vertex
       _GETNODECOUNT()
       If *pfn 
-        *pfn(*node\value) 
+        If *node <> *this\root 
+          *pfn(*node\value)
+        EndIf   
       EndIf 
       FreeMemory(*node\Vertex & #Squint_Pmask) 
       *node\vertex=0
