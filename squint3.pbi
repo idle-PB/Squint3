@@ -2,7 +2,7 @@
 Macro Comments() 
   ; SQUINT 3, Sparse Quad Union Indexed Nibble Trie
   ; Copyright Andrew Ferguson aka Idle (c) 2020 - 2023 
-  ; Version 3.1.4b
+  ; Version 3.1.4
   ; PB 5.72-6.02b 32bit/64bit asm and c backends for Windows,Mac OSX,Linux,PI,M1
   ; Thanks Wilbert for the high low insight and utf8 conversion help.
   ; Squint is a compact prefix Trie indexed by nibbles into a sparse array with performance metrics close to a map
@@ -861,7 +861,7 @@ Module SQUINT
     Protected *node.squint_node,idx,offset,nodecount,vchar.i,vret.i,count 
     Protected *old,*new,*adr,*akey.Ascii 
     *node = *this\root & #Squint_Pmask
-    *akey = *key
+    *akey = *key+(size-1)
     
     _LockMutex(gwrite) 
     
@@ -874,7 +874,7 @@ Module SQUINT
       idx = (*akey\a & $f)
       offset = (*node\squint >> (idx<<2)) & $f
       _SetNODE()
-      *akey+1 
+      *akey-1 
       count+1
     Wend
     
@@ -903,7 +903,7 @@ Module SQUINT
     
     Protected *node.squint_Node,idx,offset,nodecount,vchar.i,vret.i,count,*akey.Ascii 
     *node = *this\root & #Squint_Pmask
-    *akey = *key
+    *akey = *key+(size-1)
     
     While count <= size  
       
@@ -932,7 +932,7 @@ Module SQUINT
       Else 
         Continue 
       EndIf  
-      *akey+1
+      *akey-1
       count+1
     Wend
     
@@ -954,7 +954,7 @@ Module SQUINT
   Procedure SquintDeleteNumeric(*this.squint,*key,size=#Squint_Integer)    
     Protected *node.squint_node,idx,*mem.Character,offset,nodecount,vchar.i,vret.i,count,*akey.Ascii 
     *node = *this\root & #Squint_Pmask
-    *akey = *key
+    *akey = *key+(size-1)
     
     While count <= size 
       offset = (*node\squint >> ((*akey\a & $f0) >> 2 )) & $f
@@ -971,7 +971,7 @@ Module SQUINT
       Else
         ProcedureReturn 0
       EndIf
-      *akey+1
+      *akey-1
       count+1
     Wend
     If (*node\vertex & #Squint_Pmask) = 0
