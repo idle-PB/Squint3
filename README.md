@@ -28,7 +28,9 @@ Keys can either be numeric integers, binary, UTF-8 or UCS-2 Unicode strings, def
 
 String key functions supported: Set, Get, Enum, EnumNode, Walk, WalkNode, Delete and Prune with a flag in Delete.
 
-Numeric or Binary keys: SetNumeric, GetNumeric, DeleteNumeric, WalkNumeric. 
+Binary ke functions supported: SetBinary, GetBinary, EnumBinary, WalkBinary, DeleteBinary and Prune with a flag in Delete.
+
+Numeric or HAT keys: SetNumeric, GetNumeric, DeleteNumeric, WalkNumeric. 
 
 Squint is threadsafe with lock free Sets and Gets. 
 
@@ -92,7 +94,7 @@ num items 4,194,304 mem 109.87mb keysize 45.87 mb
 
 [badge license]: https://img.shields.io/badge/license-MIT-00b5da "Released under the MIT License"
 [badge purebasic]: https://img.shields.io/badge/PureBasic-6.0-yellow "PureBasic 6.00 (x86/x64) — Linux/OS X/Windows (Arm) PI3/Pi4"
-[badge squint]: https://img.shields.io/badge/SQUINT3-yellow "SQUINT 3"
+[badge squint]: https://img.shields.io/badge/SQUINT3-yellow "SQUINT 3.2"
 [badge travis]: https://travis-ci.com/idle-PB/SQUINT.svg?branch=master "Travis CI: EditorConfig code styles consistency validation"
 
 <!-- people -->

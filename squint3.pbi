@@ -2,7 +2,7 @@
 Macro Comments() 
   ; SQUINT 3, Sparse Quad Union Indexed Nibble Trie
   ; Copyright Andrew Ferguson aka Idle (c) 2020 - 2023 
-  ; Version 3.1.4
+  ; Version 3.2.0a
   ; PB 5.72-6.02b 32bit/64bit asm and c backends for Windows,Mac OSX,Linux,PI,M1
   ; Thanks Wilbert for the high low insight and utf8 conversion help.
   ; Squint is a compact prefix Trie indexed by nibbles into a sparse array with performance metrics close to a map
@@ -18,16 +18,18 @@ Macro Comments()
   ;     https://dotat.at/prog/qp/blog-2015-10-04.html
   ;     https://cr.yp.to/critbit.html 
   ;
-  ; Squint supports Set, Get, Enum, EnumNode , Walk, WalkNode, Delete and Prune with a flag in Delete
+  ; Squint supports Set, Get, Enum, EnumNode , Walk, WalkNode, Delete and Prune with flag  
   ; String keys can be Unicode, Ascii or UTF8 the type must be specified 
   ; all string keys get mapped to UTF8 
+  ; 
+  ; SquintBinary functions SetBinary GetBinary EnumBinary WalkBinary, Delete and Prune with flag
+  ;   
+  ; SquintNumeric supports, SetNumeric GetNumeric DeleteNumeric and WalkNumeric 
+  ; it's provided as a direct subtitute for a numeric map, keys are integers but can be either 4 or 8 bytes on x64 
+  ; longer keys can be used with the optional hash, so it behaves like a HAT      
   ;
-  ; SquintNumeric supports, SetNumeric GetNumeric DeleteNumeric and WalkNumeric
-  ; it's provided as a direct subtitute for a numeric map, keys can be any size upto #SQUINT_MAX_KEY =1024
-  ; keys are returned as pointers   
-  ;
-  ; Note while you can mix string and numeric keys in the same trie it's not recomended unless you only require set and get 
-  ;   ;
+  ; Note you can mix string, numeric and binary keys in the same trie. 
+  ; 
   ; MIT License
   ; Permission is hereby granted, Free of charge, to any person obtaining a copy
   ; of this software and associated documentation files (the "Software"), to deal
@@ -46,7 +48,9 @@ Macro Comments()
   ; LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT Or OTHERWISE, ARISING FROM,
   ; OUT OF Or IN CONNECTION With THE SOFTWARE Or THE USE Or OTHER DEALINGS IN THE
   ; SOFTWARE. 
-  
+  ;
+  ; mzHash64 https://github.com/matteo65/mzHash64 
+  ;
 EndMacro 
 
 DeclareModule SQUINT 
@@ -97,10 +101,16 @@ DeclareModule SQUINT
   Declare SquintEnum(*this.squint,*key,*pfn.squint_CB,*userdata=0,mode=#PB_Unicode)
   Declare SquintEnumNode(*this.squint,*subtrie,*key,*pfn.squint_CB,*userdata=0,mode=#PB_Unicode)
   
-  Declare SquintSetNumeric(*this.squint,*key,value.i,size=#Squint_Integer)
-  Declare SquintGetNumeric(*this.squint,*key,size = #Squint_Integer)
-  Declare SquintDeleteNumeric(*this.squint,*key,size = #Squint_Integer)
-  Declare SquintWalkNumeric(*this.squint,*pfn.squint_CB,*userdata=0)
+  Declare SquintSetNumeric(*this.squint,*key,value.i,size=#Squint_Integer,bhash=0)
+  Declare SquintGetNumeric(*this.squint,*key,size = #Squint_Integer,bhash=0)
+  Declare SquintDeleteNumeric(*this.squint,*key,size = #Squint_Integer,bhash=0)
+  Declare SquintWalkNumeric(*this.squint,*pfn.squint_CB,size=#Squint_Integer,*userdata=0)  
+  
+  Declare SquintSetBinary(*this.squint,*subtrie,*key,value.i,size)
+  Declare SquintGetBinary(*this.squint,*subtrie,*key,size)
+  Declare SquintDeleteBinary(*this.squint,*subtrie,*key,size,prune=0)
+  Declare SquintEnumBinary(*this.squint,*subtrie,*key,size,*pfn.squint_CB,*userdata=0)
+  Declare SquintWalkBinary(*this.squint,*subtrie,*pfn.squint_CB,*userdata=0)  
   
   Declare SquintSize(*this.squint)
   Declare SquintNumKeys(*this.squint)
@@ -114,10 +124,15 @@ DeclareModule SQUINT
     Enum(*key,*pfn.squint_CB,*userdata=0,mode=#PB_Unicode)
     EnumNode(*subtrie,*key,*pfn.squint_CB,*userdata=0,mode=#PB_Unicode)
     Walk(*subtrie,*pfn.squint_CB,*userdata=0)
-    SetNumeric(*key,value.i,size=#Squint_Integer) 
-    GetNumeric(*key,size= #Squint_Integer) 
-    DeleteNumeric(*key,size=#Squint_Integer)
-    WalkNumeric(*pfn.Squint_CB,*userdata=0)
+    SetNumeric(*key,value.i,size=#Squint_Integer,bhash=0) 
+    GetNumeric(*key,size= #Squint_Integer,bhash=0) 
+    DeleteNumeric(*key,size=#Squint_Integer,bhash=0)
+    WalkNumeric(*pfn.Squint_CB,size=#Squint_Integer,*userdata=0)
+    SetBinary(*subtrie,*key,value.i,size) 
+    GetBinary(*subtrie,*key,size) 
+    DeleteBinary(*subtrie,*key,size,prune=0) 
+    EnumBinary(*subtrie,*key,size,*pfn.squint_CB,*userdata=0)
+    WalkBinary(*subtrie,*pfn.squint_CB,*userdata=0) 
     Size()
     NumKeys()
   EndInterface
@@ -134,6 +149,11 @@ DeclareModule SQUINT
     Data.i @SquintGetNumeric()
     Data.i @SquintDeleteNumeric()
     Data.i @SquintWalkNumeric() 
+    Data.i @SquintSetBinary() 
+    Data.i @SquintGetBinary() 
+    Data.i @SquintDeleteBinary() 
+    Data.i @SquintEnumBinary()
+    Data.i @SquintWalkBinary()
     Data.i @SquintSize() 
     Data.i @SquintNumKeys()
   EndDataSection   
@@ -826,6 +846,278 @@ Module SQUINT
     
   EndProcedure
   
+  ;-Binaryfunctions operate the same as the string functions with no utf8 conversion   
+  
+  ;#################################################################################
+  ;#    Set a node from the root Or from a previously set node   
+  ;#    *this.squint    instance from SquintNew() 
+  ;#    *subtrie        0 or the addess of a previously stored node retuned from a Set function 
+  ;#    *key            address of a the memory 
+  ;#    value.i         non zero value or address of something  
+  ;#    size.i          size of the key in bytes    
+  ;#  example     
+  ;#     pt.point  
+  ;#     pt\x = 100 
+  ;#     pt\y = 200   
+  ;#     SquintSetBinary(sq,@pt,1,SizeOf(point))       
+  ;#  via interface  
+  ;#     sq\setBinary(@pt,123435,SizeOf(point)))    
+  ;################################################################################## 
+     
+  Procedure SquintSetBinary(*this.squint,*subtrie,*key,value.i,size)
+    
+    Protected *node.squint_node,idx,offset,nodecount,vchar.i,vret.i,count
+    Protected *old,*new,*adr,*akey.Ascii 
+    
+    If *subtrie = 0
+      *node = *this\root & #Squint_Pmask
+    Else
+      *node = *subtrie  & #Squint_Pmask 
+    EndIf 
+            
+    _LockMutex(gwrite) 
+    
+    *akey = *key 
+    
+    While count <= size  
+      *this\write = *node  
+      _sfence 
+      idx = (*akey\a >> 4) & $f
+      offset = (*node\squint >> (idx<<2)) & $f
+      _SetNODE()
+      idx = (*akey\a & $f)
+      offset = (*node\squint >> (idx<<2)) & $f
+      _SetNODE()
+      *akey+1 
+      count+1
+    Wend
+       
+    _UnlockMutex(gwrite) 
+    *this\write = 0    
+    
+    *node\value = value
+    
+    ProcedureReturn *node 
+    
+    
+  EndProcedure
+  
+  ;##################################################################################
+  ;#    Get a node from the root or from a previously stored node    
+  ;#    *this.squint    instance from SquintNew() 
+  ;#    *subtrie        0 Or the addess of a previously stored node retuned from this function 
+  ;#    size            number of bytes used for the key      
+  ;#  returns the value         
+  ;#  example  
+  ;#     pt.point  
+  ;#     pt\x = 100 
+  ;#     pt\y = 200   
+  ;#     x = squintGetBinary(sq,0,@pt,sizeof(point))   
+  ;#     or via interface 
+  ;#     x = sq\getBinary(0,@pt,sizeof(point))        
+  ;################################################################################## 
+  
+  Procedure SquintGetBinary(*this.squint,*subtrie,*key,size)
+    
+    Protected *node.squint_Node,idx,offset,nodecount,vchar.i,vret.i,count,*akey.Ascii,st  
+    
+    If *subtrie = 0
+      *node = *this\root & #Squint_Pmask
+    Else
+      *node = *subtrie  & #Squint_Pmask 
+    EndIf 
+        
+    *akey=*key 
+         
+    While count <= size  
+      
+      If *this\write <> *node   ;test to see if same as write node
+        _lfence 
+        offset = (*node\squint >> ((*akey\a & $f0) >> 2 )) & $f
+        _GETNODECOUNT()
+        If offset < nodecount
+          *node = (*node\Vertex\e[offset] & #Squint_Pmask)
+        Else
+          ProcedureReturn 0
+        EndIf
+      Else 
+        Continue 
+      EndIf  
+      
+      If *this\write <> *node   ;test to see if same as write node
+        _lfence 
+        offset = (*node\squint >> ((*akey\a & $0f) << 2)) & $f
+        _GETNODECOUNT()
+        If offset < nodecount
+          *node = (*node\Vertex\e[offset] & #Squint_Pmask)
+        Else
+          ProcedureReturn 0
+        EndIf
+      Else 
+        Continue 
+      EndIf  
+      *akey+1
+      count+1
+    Wend
+    
+    ProcedureReturn *node\value
+  EndProcedure
+  
+  ;##################################################################################
+  ;#  Resets a keys value to 0 or Deletes and Prunes all child nodes freeing up memory     
+  ;#      *this.squint   instance from SquintNew() 
+  ;#      *subtrie       0 Or the addess of a previously stored node retuned from this function 
+  ;#      *key           address of a variable or memory pointer 
+  ;#      size           number of bytes used to store the key    
+  ;#      prune          0 to reset value or 1 to delete and prune    
+  ;#  example  
+  ;#     pt.point  
+  ;#     pt\x = 100 
+  ;#     x = SquintDeleteBinary(sq,0,@pt,SizeOf(point))   
+  ;#     or via interface 
+  ;#     x = sq\DeleteBinary(0,@pt,4,1)  ;will delete all child nodes where pt\x = 100       
+  ;################################################################################## 
+  
+  Procedure SquintDeleteBinary(*this.squint,*subtrie,*key,size,prune=0)    
+    
+    Protected *node.squint_node,idx,*mem.Ascii,*akey.Ascii,offset,nodecount,vchar.l,vret.l,count,*out
+    If *subtrie = 0
+      *node = *this\root & #Squint_Pmask
+    Else
+      *node = *subtrie  & #Squint_Pmask 
+    EndIf 
+    *akey=*key 
+         
+    While count < size  
+      offset = (*node\squint >> ((*akey\a & $f0) >> 2 )) & $f
+      If *node\vertex
+        _GETNODECOUNT()
+        If (offset <> 15 Or nodecount = 16)
+          *node = *node\Vertex\e[offset] & #Squint_Pmask
+        EndIf
+      Else
+        ProcedureReturn 0
+      EndIf
+      If *node
+        offset = (*node\squint >> ((*akey\a & $0f) << 2)) & $f
+        If *node\vertex
+          _GETNODECOUNT()
+          If (offset <> 15 Or nodecount = 16)
+            *node = *node\Vertex\e[offset] & #Squint_Pmask
+          EndIf
+        Else
+          ProcedureReturn 0
+        EndIf
+      EndIf
+      *akey+1
+      count+1
+    Wend
+    
+    If prune
+      ISquintFree(*this,*node)
+      If (*node\vertex & #Squint_Pmask) = 0
+        *node\squint = 0
+      EndIf
+    Else
+      offset = *node\squint & $f
+      _GETNODECOUNT()
+      If offset <= nodecount
+        *node = (*node\Vertex\e[offset] & #Squint_Pmask)
+        If (*node\vertex & #Squint_Pmask) = 0
+          *node\squint = 0
+        EndIf
+      Else
+        ProcedureReturn 0
+      EndIf
+    EndIf
+  EndProcedure
+  
+  ;##################################################################################
+  ;#  Enumerates the Trie from a given key   
+  ;#    *this.squint instance from SquintNew() 
+  ;#    *subtrie 0 Or the addess of a previously stored node       
+  ;#    *key address 
+  ;#     size the size of the key 
+  ;#    *pfn.squint_CB address of callback function as Squint_CB(*key,*value=0,*userdata=0) 
+  ;#        where *key is pointer to the key *value is pointer to the *value, *userDate      
+  ;# example    
+  ;#     pt.point     
+  ;#     pt\x = 100 
+  ;#     we want to search for all points where x = 100, size of the search key is 4 bytes    
+  ;#     squintEnumBinary(sq,*subtrie,@pt,4,@MyCallback())       
+  ;#  or via interface 
+  ;#     sq\Enum@"cars:toyota:",@MyCallback())   
+  ;################################################################################## 
+  
+  Procedure SquintEnumBinary(*this.squint,*subtrie,*key,size,*pfn.squint_CB,*userdata=0)       
+    
+    Protected *node.squint_Node,idx,*mem.Ascii,*akey.Ascii,offset,nodecount,depth,vchar.l,vret.l,count,*out
+    Protected outkey.s{1024} 
+    
+    _LockMutex(gwrite) 
+    
+    If *subtrie = 0
+      *node = *this\root
+    Else
+      *node = *subtrie  & #Squint_Pmask 
+    EndIf 
+    
+    *akey = *key 
+    
+     While count < size  
+      
+      offset = (*node\squint >> ((*akey\a & $f0) >> 2 )) & $f
+      _GETNODECOUNT()
+      If offset < nodecount
+        *mem = @outkey+(depth>>1) 
+        *mem\a = (*mem\a & $0f) | (((*akey\a >> 4) & $f)<<4)
+        depth+1
+        *node = (*node\Vertex\e[offset] & #Squint_Pmask)
+      Else
+        _UnlockMutex(gwrite) 
+        ProcedureReturn 0
+      EndIf
+      
+      offset = (*node\squint >> ((*akey\a & $0f) << 2)) & $f
+      _GETNODECOUNT()
+      If offset < nodecount
+        *mem = @outkey+(depth>>1) 
+        *Mem\a = ((*Mem\a & $f0) | (*akey\a & $f))
+        depth+1
+        *node = (*node\Vertex\e[offset] & #Squint_Pmask)
+      Else
+        _UnlockMutex(gwrite) 
+        ProcedureReturn 0
+      EndIf
+      
+      *akey+1
+      count+1
+     
+    Wend
+    
+    IEnum(*this,*node,depth,*pfn,@outkey,*userdata)
+    
+    _UnlockMutex(gwrite) 
+    
+  EndProcedure
+  
+  Procedure SquintWalkBinary(*this.squint,*subtrie,*pfn.squint_CB,*userdata=0)    
+    
+    Protected *node, outkey.s{#SQUINT_MAX_KEY}    
+    
+    _LockMutex(gwrite) 
+    
+    If *subtrie = 0
+      *node = *this\root
+    Else
+      *node = *subtrie  & #Squint_Pmask 
+    EndIf 
+    IEnum(*this,*node,0,*pfn,@outkey,*userdata)
+    
+    _UnlockMutex(gwrite)
+    
+  EndProcedure   
+      
   Procedure SquintSize(*this.squint) 
     ProcedureReturn *this\size 
   EndProcedure   
@@ -839,30 +1131,45 @@ Module SQUINT
   ;#################################################################################
   ;#    Set a numeric key  
   ;#    note you can use both numeric or string keys in the same trie  
-  ;#    a numeric key is an address to a variable and the required size in bytes 
-  ;#     
+  ;#    a numeric key is an address to a variable and the required size 4 or 8 bytes on x64 
+  ;#    optionally you can use a hash use a hash when you don't want large keys 
+  ;#
   ;#    *this.squint instance from SquintNew() 
   ;#    *key   address of a variable or memory pointer 
   ;#    value.i non zero value or address of something  
   ;#    size.i required size in bytes    
   ;#  example     
   ;#     ikey.l = 12345 
-  ;#     SquintSetNumeric(sq,@ikey,1234567,4)  the key is a long  
+  ;#     SquintSetNumeric(sq,@ikey,1234567,4)  the key size is 4 bytes   
   ;#     pt.point  
   ;#     pt\x = 100 
   ;#     pt\y = 200   
-  ;#     SquintSetNumeric(sq,@pt,1,SizeOf(point))       
+  ;#     SquintSetNumeric(sq,@pt,1,SizeOf(point),#true) ;hashes the key         
   ;#  via interface  
   ;#     sq\setNumeric(@ikey,123435,4)    
   ;################################################################################## 
-  
-  Procedure SquintSetNumeric(*this.squint,*key,value.i,size=#Squint_Integer)
     
-    Protected *node.squint_node,idx,offset,nodecount,vchar.i,vret.i,count 
+  Procedure SquintSetNumeric(*this.squint,*key,value.i,size=#Squint_Integer,bhash=0)
+    
+    Protected *node.squint_node,idx,offset,nodecount,vchar.i,vret.i,count,hash.q 
     Protected *old,*new,*adr,*akey.Ascii 
     *node = *this\root & #Squint_Pmask
-    *akey = *key+(size-1)
     
+    If bhash 
+      *akey=*key 
+      hash = $D45E69F901E72147 ! bhash;
+      Repeat 
+        hash = $3631754B22FF2D5C * (count + *akey\a) ! (hash << 2) ! (hash >> 2);
+        *akey + 1
+        count+1 
+      Until count >= size 
+      count = 0 
+      size = 8
+      *akey = @hash+(#Squint_Integer-1)
+    Else 
+      *akey = *key+(size-1)
+    EndIf 
+        
     _LockMutex(gwrite) 
     
     While count <= size  
@@ -884,27 +1191,41 @@ Module SQUINT
     *node\value = value
     
   EndProcedure
-  
-  
+    
   ;##################################################################################
   ;#    Get a numeric node     
   ;#    *this.squint instance from SquintNew() 
   ;#    *key   address of a variable or memory pointer 
-  ;#    size   number of bytes used to store the key    
-  ;#  returns the value         
+  ;#    size   number of bytes used to store the key 4 or 8 x64 or an arbitatry size if using the hash     
+  ;#    bhash  set to #true if your hashing the key  
+  ;#    #returns the value         
   ;#  example  
-  ;#     key.l = 12345  
-  ;#     x = squintGetNumeric(sq,@ikey,4)   
-  ;#     or via interface 
-  ;#     x = sq\get(@ikey,4)      
+  ;#    key.l = 12345  
+  ;#    x = squintGetNumeric(sq,@ikey,4)   
+  ;#    or via interface 
+  ;#    x = sq\get(@ikey,4)      
   ;################################################################################## 
   
-  Procedure SquintGetNumeric(*this.squint,*key,size=#Squint_Integer)
+  Procedure SquintGetNumeric(*this.squint,*key,size=#Squint_Integer,bhash=0)
     
-    Protected *node.squint_Node,idx,offset,nodecount,vchar.i,vret.i,count,*akey.Ascii 
+    Protected *node.squint_Node,idx,offset,nodecount,vchar.i,vret.i,count,*akey.Ascii,hash.q,st  
     *node = *this\root & #Squint_Pmask
-    *akey = *key+(size-1)
     
+    If bhash 
+      *akey=*key 
+      hash = $D45E69F901E72147 ! bhash;
+      Repeat 
+        hash = $3631754B22FF2D5C * (count + *akey\a) ! (hash << 2) ! (hash >> 2);
+        *akey + 1
+        count+1 
+      Until count >= size 
+      count = 0 
+      size = 8
+      *akey = @hash+(#Squint_Integer-1)
+    Else 
+      *akey = *key+(size-1)
+    EndIf 
+        
     While count <= size  
       
       If *this\write <> *node   ;test to see if same as write node
@@ -951,11 +1272,25 @@ Module SQUINT
   ;#     x = sq\DeleteNumeric(@ikey,4)      
   ;################################################################################## 
   
-  Procedure SquintDeleteNumeric(*this.squint,*key,size=#Squint_Integer)    
-    Protected *node.squint_node,idx,*mem.Character,offset,nodecount,vchar.i,vret.i,count,*akey.Ascii 
+  Procedure SquintDeleteNumeric(*this.squint,*key,size=#Squint_Integer,bhash=0)    
+    Protected *node.squint_node,idx,*mem.Character,offset,nodecount,vchar.i,vret.i,count,*akey.Ascii,hash.q 
     *node = *this\root & #Squint_Pmask
-    *akey = *key+(size-1)
     
+    If bhash 
+      *akey=*key 
+      hash = $D45E69F901E72147 ! bhash;
+      Repeat 
+        hash = $3631754B22FF2D5C * (count + *akey\a) ! (hash << 2) ! (hash >> 2);
+        *akey + 1
+        count+1 
+      Until count >= size 
+      count = 0 
+      size = 8
+      *akey = @hash+(#Squint_Integer-1)
+    Else 
+      *akey = *key+(size-1)
+    EndIf 
+        
     While count <= size 
       offset = (*node\squint >> ((*akey\a & $f0) >> 2 )) & $f
       _GETNODECOUNT()
@@ -978,8 +1313,8 @@ Module SQUINT
       *node\squint = 0
     EndIf
   EndProcedure
-  
-  Procedure IEnumNumeric(*this.squint,*node.squint_Node,idx,depth,*pfn.squint_CB,*userdata=0)
+                  
+  Procedure IEnumNumeric(*this.squint,*node.squint_Node,idx,depth,*pfn.squint_CB,size,*userdata=0)
     Protected a.i,offset,nodecount,*mem.Ascii,vchar.i,vret.i 
     If Not *node
       ProcedureReturn 0
@@ -990,16 +1325,39 @@ Module SQUINT
         _GETNODECOUNT()
         If (offset <> 15 Or nodecount = 16)
           _POKENHL(@*this\sb,depth,a)
-          IEnumNumeric(*this,*node\Vertex\e[offset] & #Squint_Pmask,0,depth+1,*pfn,*userdata)
+          IEnumNumeric(*this,*node\Vertex\e[offset] & #Squint_Pmask,0,depth+1,*pfn,size,*userdata)
         EndIf
       EndIf
     Next
+    
     If *node\vertex=0
-      vchar = PeekI(@*this\sb)
-      If *pfn  
-        *pfn(@*this\sb,*node\value,*userdata)
+      vchar = PeekI(@*this\sb) 
+      CompilerIf #PB_Compiler_Backend = #PB_Backend_C 
+        CompilerIf #PB_Compiler_Processor = #PB_Processor_x64  
+          !v_vchar = __builtin_bswap64(v_vchar);    
+        CompilerElse 
+          !v_vchar = __builtin_bswap32(v_vchar);     
+        CompilerEndIf
+      CompilerElse 
+        EnableASM
+        mov rax, vchar
+        bswap rax;
+        mov vchar,rax
+        DisableASM 
+      CompilerEndIf 
+      
+      CompilerIf #PB_Compiler_Processor = #PB_Processor_x64  
+         If size = 4 
+           vchar >> 32 
+         EndIf
+      CompilerEndIf   
+      
+      If *pfn   
+        *pfn(@vchar,*node\value,*userdata)
       EndIf
+      
     EndIf
+    
     ProcedureReturn *node
   EndProcedure
   
@@ -1014,14 +1372,31 @@ Module SQUINT
   ;#     sq\WalkNumeric(@MyCallback())   
   ;################################################################################## 
   
-  Procedure SquintWalkNumeric(*this.squint,*pfn.squint_CB,*userdata=0)       
+  Procedure SquintWalkNumeric(*this.squint,*pfn.squint_CB,size=#Squint_Integer,*userdata=0)       
+    
+    Protected outkey.s{#SQUINT_MAX_KEY}        
+    
     _LockMutex(gwrite) 
-    
-    IEnumNumeric(*this,*this\root,0,0,*pfn,*userdata)
-    
+        
+    CompilerIf #PB_Compiler_Processor = #PB_Processor_x64  
+      If size > 8 
+        IEnum(*this,*this\root,0,*pfn,@outkey,*userdata)
+      Else 
+        IEnumNumeric(*this,*this\root,0,0,*pfn,size,*userdata)
+      EndIf   
+    CompilerElse 
+      If size > 4 
+        IEnum(*this,*this\root,0,*pfn,@outkey,*userdata)
+      Else 
+        IEnumNumeric(*this,*this\root,0,0,*pfn,size,*userdata)
+      EndIf   
+      
+    CompilerEndIf  
+      
     _UnLockMutex(gwrite)
     
   EndProcedure
+     
   
 EndModule 
 
@@ -1154,25 +1529,40 @@ CompilerIf #PB_Compiler_IsMainFile
     
     sq.isquint = SquintNew()
     ikey=1
-    sq\SetNumeric(@ikey,123)
+    sq\SetNumeric(@ikey,123,4)
     ikey=4
-    sq\SetNumeric(@ikey,456)
+    sq\SetNumeric(@ikey,456,4)
     ikey=8
-    sq\SetNumeric(@ikey,8910)
+    sq\SetNumeric(@ikey,8910,4)
     
     ikey=1
-    PrintN(Str(sq\GetNumeric(@ikey))) 
+    PrintN(Str(sq\GetNumeric(@ikey,4))) 
     ikey=2
-    PrintN(Str(sq\GetNumeric(@ikey))) 
+    PrintN(Str(sq\GetNumeric(@ikey,4))) 
     ikey=4
-    PrintN(Str(sq\GetNumeric(@ikey))) 
+    PrintN(Str(sq\GetNumeric(@ikey,4))) 
     ikey=6
-    PrintN(Str(sq\GetNumeric(@ikey))) 
+    PrintN(Str(sq\GetNumeric(@ikey,4))) 
     ikey=8
-    PrintN(Str(sq\GetNumeric(@ikey))) 
+    PrintN(Str(sq\GetNumeric(@ikey,4))) 
     
     PrintN("-------Walk numeric ----") 
-    sq\WalkNumeric(@CBSquintWalkNum())      
+    sq\WalkNumeric(@CBSquintWalkNum(),4)      
+    
+    *rd = AllocateMemory(256) 
+    RandomSeed(1) 
+    For a = 1 To 100 
+      RandomData(*rd,256)
+      sq\SetNumeric(*rd,a,256,1) 
+      sum+a
+    Next  
+     RandomSeed(1) 
+    For a = 1 To 100 
+      RandomData(*rd,256)
+      ct + sq\GetNumeric(*rd,256,1) 
+    Next  
+    Debug ct 
+    Debug sum 
     
     sq\Free()   
     
@@ -1225,7 +1615,7 @@ CompilerIf #PB_Compiler_IsMainFile
     Next  
     
     CompilerIf #TestNumeric 
-      avgkeylen=8 
+      avgkeylen=4 
     CompilerElse  
       avgkeylen = keylen/lt    
     CompilerEndIf  
@@ -1260,13 +1650,13 @@ CompilerIf #PB_Compiler_IsMainFile
           CompilerEndIf   
         CompilerElse   
           CompilerIf #TestNumeric  
-            ;x = FindMapElement(mp(),Str(num)) & 1    ;swap comment for 5 x map speed 
-            x = mp(Str(num)) & 1                      ;this shouldn't slow it down   
+            x = FindMapElement(mp(),Str(num)) & 1    ;swap comment for 5 x map speed 
+            ;x = mp(Str(num)) & 1                      ;this shouldn't slow it down   
             cx = (1 | x)   
           CompilerElse   
             key = Hex(num)
-            ;x = (FindMapElement(mp(),key) & 1)         ;swap comment for 5 x map speed 
-            x = mp(key) & 1 
+            x = (FindMapElement(mp(),key) & 1)         ;swap comment for 5 x map speed 
+            ;x = mp(key) & 1 
             cx = (1 | x)   
           CompilerEndIf  
         CompilerEndIf  
