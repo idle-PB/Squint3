@@ -28,7 +28,7 @@ Keys can either be numeric integers, binary, UTF-8 or UCS-2 Unicode strings, def
 
 String key functions supported: Set, Get, Enum, EnumNode, Walk, WalkNode, Delete and Prune with a flag in Delete.
 
-Binary ke functions supported: SetBinary, GetBinary, EnumBinary, WalkBinary, DeleteBinary and Prune with a flag in Delete.
+Binary key functions supported: SetBinary, GetBinary, EnumBinary, WalkBinary, DeleteBinary and Prune with a flag in Delete.
 
 Numeric or HAT keys: SetNumeric, GetNumeric, DeleteNumeric, WalkNumeric. 
 
