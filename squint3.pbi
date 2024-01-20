@@ -1416,6 +1416,8 @@ CompilerIf #PB_Compiler_IsMainFile
       PrintN(sout + " " + Str(*value))
     EndIf 
     
+    ProcedureReturn 1
+    
   EndProcedure
   
   Procedure CBSquintWalk(*key,value,*userData)
@@ -1440,22 +1442,21 @@ CompilerIf #PB_Compiler_IsMainFile
     
     OpenConsole() 
     ;test with interface  
-    ;key = "subtrieA:"                ;create a subtrie called subtrie_a_ 
-    SubTrieA = sq\Set(0,@"subtrieA:",123)    ;Set it with utf8 flag it returns the root of the sub trie 
+    SubTrieA = sq\Set(0,@"subtrieA:",123)    ;Set returns the root of the subtrie 
     
     key = "abc"                                
-    sq\Set(SubTrieA,@key,1)          ;key evaluates as subtrieA:abc  to the sub trie  
+    sq\Set(SubTrieA,@key,1)          ;key evaluates as subtrieA:abc  adds abc to the sub trie  
     
     key = "abcd" 
-    sq\Set(SubTrieA,@key,1)          ;key evaluates as subtrieA:abcd  to the sub trie  
-    
+    sq\Set(SubTrieA,@key,1)          ;key evaluates as subtrieA:abcd  adds abcd to the sub trie  
+       
     *key = UTF8("utf8:" + Chr($20AC) + Chr($A9))  
     sq\Set(SubTrieA,*key,2,#PB_UTF8) ;add it to the sub trie with utf8 key  
     
     key.s = "unicode:" + Chr($20AC) + Chr($A9)  
     sq\Set(SubTrieA,@key,3) ;add it to the sub trie with utf8 key 
     
-    *key = Ascii("cde") 
+    *key = Ascii("cde")               ;set ascii key  
     sq\set(SubTrieA,*key,4,#PB_Ascii) ;add to sub trie with ascii key    
     
     PrintN("value from ascii key " + Str(sq\Get(SubTrieA,*key,#PB_Ascii)))  ;get the value from the ascci key  
@@ -1464,14 +1465,14 @@ CompilerIf #PB_Compiler_IsMainFile
     PrintN("value from unicode key " + Str(sq\Get(SubTrieA,@key)))            ;get the unicode key  
     
     PrintN("the stored node aka subtrieA: = " + Str(SubTrieA))   
-    PrintN(" look up subtrie node " + Str( sq\Get(0,@"subtrieA:",#PB_Unicode,0)))   
+    PrintN(" look up subtrie node " + Str(sq\Get(0,@"subtrieA:",#PB_Unicode,0)))   
     PrintN(" look up its value  " +   Str(sq\Get(0,@"subtrieA:")))  
     
     PrintN("___ENUM from stored pointer to subtrieA")
-    key = "ab"
-    sq\EnumNode(SubTrieA,@key,@CBSquint())                 ;returns the root key + sub keys   
+    key = "a"
+    sq\EnumNode(SubTrieA,@key,@CBSquint())    ;returns the root key + sub keys   
     
-    key.s = "subtrie_b_"                      ;test raw access no interface   
+    key.s = "subtrie_b:"                      ;test raw access no interface   
     SubTrie_B = SquintSetNode(sq,0,@key,456)  ;make another sub trie root_pb 
     
     key = "abc"
@@ -1558,15 +1559,15 @@ CompilerIf #PB_Compiler_IsMainFile
     RandomSeed(1) 
     For a = 1 To 100 
       RandomData(*rd,256)
-      sq\SetNumeric(*rd,a,256,1) 
+      sq\SetNumeric(*rd,a,256,1)  ;set a bigkey using hash  
       sum+a
     Next  
      RandomSeed(1) 
     For a = 1 To 100 
       RandomData(*rd,256)
-      ct + sq\GetNumeric(*rd,256,1) 
+      ct + sq\GetNumeric(*rd,256,1) ;get a big key using hash
     Next  
-    Debug ct 
+    Debug ct     ;check that ct matches sum
     Debug sum 
     
     sq\Free()   
