@@ -1934,7 +1934,7 @@ CompilerIf #PB_Compiler_IsMainFile
     #TestNumeric = 0
     #Randomkeys = 1
         
-    Global lt = 1 << 1  
+    Global lt = 1 << 24  
     
     Global gQuit,lt,a,num,memsize 
     Global keylen,avgkeylen  
@@ -2144,13 +2144,17 @@ CompilerIf #PB_Compiler_IsMainFile
     out +  "Enums Keys " +  FormatNumber(totalenum,0) + #CRLF$
     out +  "Enum Rate "  +  FormatNumber(Enumkey/1024/1024,2,".",",") + " mb p/s"  + #CRLF$ 
     out +  #CRLF$
-        
-    For a = 1 To gcount-1 
+    
+    CompilerIf #TestNumeric = 0 
+      
+      For a = 1 To gcount-1 
       If sq\Get(0,@gkeys(a)) <>  Val(gkeys(a)) 
         PrintN("error " + Str(a) + " " + Str(sq\Get(0,@gkeys(a))))  
       EndIf   
-    Next 
-    
+    Next   
+      
+    CompilerEndIf 
+       
     out + tout 
     Print(out) 
     SetClipboardText(out)
