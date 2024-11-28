@@ -226,16 +226,6 @@ Module SQUINT
     CompilerEndIf 
   EndMacro
   
-  ;   Global gEnumlock.i = CreateMutex()   
-  ;   
-  ;   Macro _gEnumlock(x)
-  ;     CompilerIf #PB_Compiler_Backend = #PB_Backend_C 
-  ;       !__atomic_exchange_n(&squintXg_genumlock,x,__ATOMIC_SEQ_CST) ; 
-  ;     CompilerElse  
-  ;       !mov rdx, x  
-  ;       !xchg qword [squint.v_gEnumlock] , rdx
-  ;     CompilerEndIf 
-  ;   EndMacro 
   ;   
   ;   Macro _sfence
   ;     CompilerIf #PB_Compiler_Backend = #PB_Backend_Asm  
@@ -1934,14 +1924,13 @@ CompilerIf #PB_Compiler_IsMainFile
       ProcedureReturn 1 
       
     EndProcedure
-    
-    
+        
     OpenConsole()
     
     #TestNumeric = 0
     #Randomkeys = 1
         
-    Global lt = 1 << 2  
+    Global lt = 1 << 24  
     
     Global gQuit,lt,a,num,memsize 
     Global keylen,avgkeylen  
@@ -1949,13 +1938,12 @@ CompilerIf #PB_Compiler_IsMainFile
     Global gcount, gnum = (1 << 24)
     Global gmask = gnum-1
     Global Dim gkeys.s(gnum) 
-    
-    
+        
     sq.isquint = SquintNew()
     
     Global NUMTHREADS = CountCPUs(#PB_System_CPUs) 
     
-    If NUMTHREADS < 3 
+    If NUMTHREADS < 12 
       MessageRequester("Squint thread tests", "system doesn't have enough core threads for tests") 
       NUMTHREADS = 3   
     EndIf   
@@ -2155,10 +2143,10 @@ CompilerIf #PB_Compiler_IsMainFile
     CompilerIf #TestNumeric = 0 
       
       For a = 1 To gcount-1 
-      If sq\Get(0,@gkeys(a)) <>  Val(gkeys(a)) 
-        PrintN("error " + Str(a) + " " + Str(sq\Get(0,@gkeys(a))))  
-      EndIf   
-    Next   
+        If sq\Get(0,@gkeys(a)) <>  Val(gkeys(a)) 
+          PrintN("error " + Str(a) + " " + Str(sq\Get(0,@gkeys(a))))  
+        EndIf   
+      Next   
       
     CompilerEndIf 
        
