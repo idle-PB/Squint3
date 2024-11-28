@@ -318,7 +318,7 @@ Module SQUINT
         XCHG_(@*node,*node\Vertex\e[offset] & #Squint_Pmask)  
       Else  
         
-        XCHG_(@*this\write,1)   
+        XCHG_(@*this\write,*node)   
         offset = nodecount
         nodecount+1 
         
@@ -350,7 +350,7 @@ Module SQUINT
       
     Else
       
-      XCHG_(@*this\write,1)   
+      XCHG_(@*this\write,*node)   
       
       *node\vertex = AllocateMemory(SizeOf(squint_Node))
       
@@ -669,7 +669,7 @@ Module SQUINT
       While vchar
         
         l1:
-        If *this\write =0 
+        If *this\write <> *node
           ;_lfence 
           offset = (*node\squint >> ((vchar & $f0) >> 2 )) & $f
           _GETNODECOUNT()
@@ -684,7 +684,7 @@ Module SQUINT
         EndIf  
         
         l2:
-        If *this\write=0 
+        If *this\write <> *node 
           ;_lfence 
           offset = (*node\squint >> ((vchar & $0f) << 2)) & $f
           _GETNODECOUNT()
@@ -866,7 +866,7 @@ Module SQUINT
       While vchar
         
         l1:
-        If *this\write = 0 
+        If *this\write <> *node 
           ;_lfence 
           offset = (*node\squint >> ((vchar & $f0) >> 2 )) & $f
           _GETNODECOUNT()
@@ -882,7 +882,7 @@ Module SQUINT
         EndIf  
         
         l2:
-        If *this\write = 0
+        If *this\write <> *node
           ;_lfence 
           offset = (*node\squint >> ((vchar & $0f) << 2)) & $f
           _GETNODECOUNT()
@@ -1477,7 +1477,7 @@ Module SQUINT
     While count <= size  
       
       l1:
-      If *this\write = 0 
+      If *this\write <> *node 
         ; _lfence 
         offset = (*node\squint >> ((*akey\a & $f0) >> 2 )) & $f
         _GETNODECOUNT()
@@ -1491,7 +1491,7 @@ Module SQUINT
       EndIf  
       
       l2:
-      If *this\write = 0 
+      If *this\write <> *node 
         ;_lfence 
         offset = (*node\squint >> ((*akey\a & $0f) << 2)) & $f
         _GETNODECOUNT()
