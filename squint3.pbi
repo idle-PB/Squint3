@@ -249,17 +249,17 @@ Module SQUINT
   ;     CompilerEndIf   
   ;   EndMacro 
   ;   
-  ;   Macro _lfence 
-  ;     CompilerIf #PB_Compiler_Backend = #PB_Backend_Asm   
-  ;        !lfence
-  ;     CompilerElse
-  ;       CompilerIf #PB_Compiler_Processor = #PB_Processor_Arm32 Or #PB_Compiler_Processor = #PB_Processor_Arm64 
-  ;         !__sync_synchronize();
-  ;       CompilerElse  
-  ;         !__asm__("lfence" ::: "memory"); 
-  ;       CompilerEndIf   
-  ;     CompilerEndIf    
-  ;   EndMacro 
+  ;     Macro _lfence 
+  ;       CompilerIf #PB_Compiler_Backend = #PB_Backend_Asm   
+  ;         ; !lfence
+  ;       CompilerElse
+  ;         CompilerIf #PB_Compiler_Processor = #PB_Processor_Arm32 Or #PB_Compiler_Processor = #PB_Processor_Arm64 
+  ;           !__sync_synchronize();
+  ;         CompilerElse  
+  ;           !__asm__("lfence" ::: "memory"); 
+  ;         CompilerEndIf   
+  ;       CompilerEndIf    
+  ;     EndMacro 
   
   Macro _CONVERTUTF8() 
     
@@ -499,7 +499,8 @@ Module SQUINT
         EndIf
       EndIf
     Next
-    
+    FreeMutex(*this\mwrite)
+    FreeMutex(*this\menum) 
     FreeMemory(*this\root)
     nodecount = *this\size 
     FreeMemory(*this) 
@@ -688,6 +689,7 @@ Module SQUINT
             ProcedureReturn 0
           EndIf
         Else 
+          Delay(0)
           Goto l1  
         EndIf  
         
@@ -702,6 +704,7 @@ Module SQUINT
             ProcedureReturn 0
           EndIf
         Else 
+          Delay(0)
           Goto l2  
         EndIf 
         
@@ -884,6 +887,7 @@ Module SQUINT
             Break 
           EndIf
         Else 
+          Delay(0)
           Goto l1  
         EndIf  
         
@@ -899,6 +903,7 @@ Module SQUINT
             Break 
           EndIf
         Else 
+          Delay(0)
           Goto l2
         EndIf 
         
@@ -923,13 +928,13 @@ Module SQUINT
         
         UnlockMutex(*this\mwrite)
         
-        SquintFree(*new)
+        SquintFree(*old)
         
       Else 
         
         *old = *this\merge
         XCHG_(@*this\merge,0)    
-        SquintFree(*new)
+        SquintFree(*old)
         
       EndIf 
       
@@ -991,7 +996,7 @@ Module SQUINT
     
     _UnlockMutex(*this\mwrite)
     
-    SquintFree(*new)
+    SquintFree(*old)
     
     _UnlockMutex(*this\menum) 
     
@@ -1034,7 +1039,7 @@ Module SQUINT
     
     _UnlockMutex(*this\mwrite)
     
-    SquintFree(*new)
+    SquintFree(*old)
     
     _UnlockMutex(*this\menum) 
     
@@ -1321,7 +1326,7 @@ Module SQUINT
       
       *old = *this\merge
       XCHG_(@*this\merge,0)    
-      SquintFree(*new)
+      SquintFree(*old)
       
     EndIf 
     
@@ -1354,7 +1359,7 @@ Module SQUINT
     
     _UnlockMutex(*this\mwrite)
     
-    SquintFree(*new)
+    SquintFree(*old)
     
     _UnlockMutex(*this\menum) 
     
@@ -1609,10 +1614,11 @@ Module SQUINT
         EndIf
       CompilerEndIf   
       
-      If *pfn   
-        *pfn(@vchar,*node\value,*userdata)
-      EndIf
-      
+      If *node\value
+        If *pfn   
+          *pfn(@vchar,*node\value,*userdata)
+        EndIf
+      EndIf 
     EndIf
     
     ProcedureReturn *node
@@ -1631,39 +1637,40 @@ Module SQUINT
   
   Procedure SquintWalkNumeric(*this.squint,*pfn.squint_CB,size=#Squint_Integer,*userdata=0)       
     
-    Protected *node,*new.squint,*old.squint,out.i,outkey.s{#SQUINT_MAX_KEY}        
+    Protected depth,*node.squint_node,*new.squint,*old.squint,out.i,outkey.s{#SQUINT_MAX_KEY}        
     
     _LockMutex(*this\menum)
     
     *new = SquintNew()     
+     
     XCHG_(@*this\merge,*new) 
     
     *node = *this\root & #Squint_Pmask
-    
+       
     CompilerIf #PB_Compiler_Processor = #PB_Processor_x64  
       If size > 8 
         IEnum(*this,*node,0,*pfn,@outkey,*userdata)
       Else 
-        IEnumNumeric(*this,*node,0,*pfn,@out,size,*userdata)
+        IEnumNumeric(*this,*node,depth,*pfn,@out,size,*userdata)
       EndIf   
     CompilerElse 
       If size > 4 
         IEnum(*this,*node,0,*pfn,@outkey,*userdata)
       Else 
-        IEnumNumeric(*this,*node,0,*pfn,@out,size,*userdata)
+        IEnumNumeric(*this,*node,depth,*pfn,@out,size,*userdata)
       EndIf   
       
     CompilerEndIf  
     
     _LockMutex(*this\mwrite)  
-    
+       
     *old = *this\merge
     XCHG_(@*this\merge,0)               
-    SquintMerge(*old,*this) 
+    SquintMerge(*old,*this,0,1) 
     
     _UnlockMutex(*this\mwrite)
-    
-    SquintFree(*new)
+           
+    SquintFree(*old)
     
     _UnlockMutex(*this\menum) 
     
@@ -1725,7 +1732,7 @@ CompilerIf #PB_Compiler_IsMainFile
     
   EndProcedure
   
-  OnErrorCall(@ErrorHandler())
+  ;OnErrorCall(@ErrorHandler())
   
   Procedure CBSquint(*key,*value,*userData)  
     Protected sout.s  
@@ -1934,7 +1941,7 @@ CompilerIf #PB_Compiler_IsMainFile
     #TestNumeric = 0
     #Randomkeys = 1
         
-    Global lt = 1 << 24  
+    Global lt = 1 << 2  
     
     Global gQuit,lt,a,num,memsize 
     Global keylen,avgkeylen  
