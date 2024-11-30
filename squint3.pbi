@@ -336,7 +336,7 @@ Module SQUINT
         
         _SETINDEX(*node\squint,idx,offset)
         
-        ;*node\Vertex = btc(*node\Vertex)
+        *node\Vertex = btc(*node\Vertex)
         
         XCHG_(@*node,(*node\Vertex\e[offset] & #Squint_Pmask))
                
@@ -362,7 +362,7 @@ Module SQUINT
       *node\squint = -1
       _SETINDEX(*node\squint,idx,0)
       
-      ;*node\Vertex = BTC(*node\Vertex)
+      *node\Vertex = BTC(*node\Vertex)
       
       XCHG_(@*node,(*node\Vertex\e[0] & #Squint_Pmask))
       
@@ -524,7 +524,7 @@ Module SQUINT
   EndProcedure
   
   Procedure ISquintMerge(*this.squint,*node.squint_Node,*target.squint,depth,*outkey,numeric)
-    Protected a.i,offset,nodecount,*mem.Ascii,key.s 
+    Protected a.i,offset,nodecount,*mem.Ascii,key.s,*tnode 
     
     If Not *node
       ProcedureReturn 0
@@ -537,7 +537,8 @@ Module SQUINT
         _GETNODECOUNT()
         If (offset <> 15 Or nodecount = 16)
           _POKENHL(*outkey,depth,a)
-          If ISquintMerge(*this,*node\Vertex\e[offset] & #Squint_Pmask,*target,depth+1,*outkey,numeric) = 0 
+          XCHG_(@*tnode,(*node\Vertex\e[offset] & #Squint_Pmask))
+          If ISquintMerge(*this,*tnode,*target,depth+1,*outkey,numeric) = 0 
             Break 
           EndIf  
         EndIf
@@ -624,9 +625,7 @@ Module SQUINT
         *node = *subtrie & #Squint_Pmask
       EndIf
     EndIf 
-    
-    ;XCHG_(@*this\write,*node) 
-    
+      
     _CONVERTUTF8()
     
     While vchar
@@ -654,7 +653,7 @@ Module SQUINT
     offset = *node\squint & $f
     
     _SETNODE()
-    ; XCHG_(@*this\write,0);
+   
     If bmerge 
       *this\merge\count+1 
     Else 
@@ -704,7 +703,7 @@ Module SQUINT
         
         l1:
         If Not (*node & 1) 
-          ;_lfence 
+          
           offset = (*node\squint >> ((vchar & $f0) >> 2 )) & $f
           _GETNODECOUNT()
           If offset < nodecount
@@ -719,7 +718,7 @@ Module SQUINT
         
         l2:
         If Not (*node & 1) 
-          ;_lfence 
+          
           offset = (*node\squint >> ((vchar & $0f) << 2)) & $f
           _GETNODECOUNT()
           If offset < nodecount
@@ -830,7 +829,7 @@ Module SQUINT
   EndProcedure
   
   Procedure IEnum(*this.squint,*node.squint_Node,depth,*pfn.squint_CB,*outkey,*userdata=0)
-    Protected a.i,offset,nodecount,*mem.Ascii 
+    Protected a.i,offset,nodecount,*mem.Ascii;,*tnode 
     
     If Not *node
       ProcedureReturn 0
@@ -843,7 +842,8 @@ Module SQUINT
         _GETNODECOUNT()
         If (offset <> 15 Or nodecount = 16)
           _POKENHL(*outkey,depth,a)
-          If IEnum(*this,*node\Vertex\e[offset] & #Squint_Pmask,depth+1,*pfn,*outkey,*userdata) = 0 
+          ;*tnode = *node\Vertex\e[offset] & #Squint_Pmask
+          If IEnum(*this,(*node\Vertex\e[offset] & #Squint_Pmask),depth+1,*pfn,*outkey,*userdata) = 0 
             Break 
           EndIf  
         EndIf
@@ -889,9 +889,9 @@ Module SQUINT
     XCHG_(@*this\merge,*new) 
     
     If *subtrie = 0
-      *node = *this\root & #Squint_Pmask
+       *node = *this\root & #Squint_Pmask
     Else 
-      *node = *subtrie & #Squint_Pmask
+       *node = *subtrie & #Squint_Pmask
     EndIf 
     _CONVERTUTF8()
     
@@ -901,11 +901,12 @@ Module SQUINT
         
         l1:
         If Not (*node & 1)
-          ;_lfence 
+          
           offset = (*node\squint >> ((vchar & $f0) >> 2 )) & $f
           _GETNODECOUNT()
           If offset < nodecount
             *node = (*node\Vertex\e[offset] & #Squint_Pmask)
+            ;XCHG_(@*node,(*node\Vertex\e[offset] & #Squint_Pmask))
           Else
             bnmerge = 1
             Break 
@@ -917,11 +918,12 @@ Module SQUINT
         
         l2:
         If Not (*node & 1)
-          ;_lfence 
+         
           offset = (*node\squint >> ((vchar & $0f) << 2)) & $f
           _GETNODECOUNT()
           If offset < nodecount
             *node = (*node\Vertex\e[offset] & #Squint_Pmask)
+            ;XCHG_(@*node,(*node\Vertex\e[offset] & #Squint_Pmask))
           Else
             bnmerge = 1 
             Break 
@@ -950,14 +952,17 @@ Module SQUINT
         XCHG_(@*this\merge,0)               
         SquintMerge(*old,*this)
         
-        UnlockMutex(*this\mwrite)
+        _UnlockMutex(*this\mwrite)
         
         SquintFree(*old)
         
       Else 
         
+        _LockMutex(*this\mwrite)  
         *old = *this\merge
         XCHG_(@*this\merge,0)    
+        
+        _UnlockMutex(*this\mwrite)
         SquintFree(*old)
         
       EndIf 
@@ -1167,7 +1172,7 @@ Module SQUINT
       
       l1:
       If Not (*node & 1) 
-        ;_lfence 
+       
         offset = (*node\squint >> ((*akey\a & $f0) >> 2 )) & $f
         _GETNODECOUNT()
         If offset < nodecount
@@ -1181,7 +1186,7 @@ Module SQUINT
       
       l2:
       If Not (*node & 1) 
-        ;_lfence 
+        
         offset = (*node\squint >> ((*akey\a & $0f) << 2)) & $f
         _GETNODECOUNT()
         If offset < nodecount
@@ -1617,8 +1622,6 @@ Module SQUINT
     EndIf
     
     For a = 0 To 15 
-      ;XCHG_(@offset,*node\squint)
-      ;offset = (offset >> (a<<2)) & $f
       offset = (*node\squint >> (a<<2)) & $f
       If (*node\vertex And *node\squint)
         _GETNODECOUNT()
@@ -1974,10 +1977,10 @@ CompilerIf #PB_Compiler_IsMainFile
         
     OpenConsole()
     
-    #TestNumeric = 1
+    #TestNumeric = 0
     #Randomkeys = 1
         
-    Global lt = 0;1 << 1  
+    Global lt = 1 ;<< 4  
     
     Global gQuit,lt,a,num,memsize 
     Global keylen,avgkeylen  
@@ -2097,7 +2100,7 @@ CompilerIf #PB_Compiler_IsMainFile
       
       Repeat
         CompilerIf #TestNumeric = 0 
-          num = Random(lt,1) 
+          num = Random(gnum,1) 
           key = Left(gkeys(num),3) 
           If key <> "" 
             sq\EnumNode(0,@key,@CBEnum(),*ct)
