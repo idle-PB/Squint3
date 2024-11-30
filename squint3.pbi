@@ -82,10 +82,10 @@ DeclareModule SQUINT
   EndStructure
   
   CompilerIf #PB_Compiler_32Bit 
-    #Squint_Pmask = $ffffffff
+    #Squint_Pmask = $fffffffe
     #Squint_Integer = 4 
   CompilerElse
-    #Squint_Pmask = $ffffffffffff
+    #Squint_Pmask = $fffffffffffe
     #Squint_Integer = 8 
   CompilerEndIf
   
@@ -178,7 +178,8 @@ Module SQUINT
     CompilerIf #PB_Compiler_32Bit 
       nodecount = MemorySize(*node\vertex) / SizeOf(squint_node)
     CompilerElse
-      nodecount = (*node\vertex >> 48)
+      XCHG_(@nodecount,*node\vertex) 
+      nodecount >> 48 ;= (*node\vertex >> 48)
     CompilerEndIf
   EndMacro
   
@@ -227,29 +228,29 @@ Module SQUINT
   EndMacro
   
   ;   
-  ;   Macro _sfence
-  ;     CompilerIf #PB_Compiler_Backend = #PB_Backend_Asm  
-  ;       !sfence 
-  ;     CompilerElse 
-  ;       CompilerIf #PB_Compiler_Processor = #PB_Processor_Arm32 Or #PB_Compiler_Processor = #PB_Processor_Arm64
-  ;         !__sync_synchronize();
-  ;       CompilerElse   
-  ;         !__asm__("sfence" ::: "memory");   
-  ;       CompilerEndIf   
-  ;     CompilerEndIf   
-  ;   EndMacro 
-  ;   
-  ;     Macro _lfence 
-  ;       CompilerIf #PB_Compiler_Backend = #PB_Backend_Asm   
-  ;         ; !lfence
-  ;       CompilerElse
-  ;         CompilerIf #PB_Compiler_Processor = #PB_Processor_Arm32 Or #PB_Compiler_Processor = #PB_Processor_Arm64 
-  ;           !__sync_synchronize();
-  ;         CompilerElse  
-  ;           !__asm__("lfence" ::: "memory"); 
-  ;         CompilerEndIf   
-  ;       CompilerEndIf    
-  ;     EndMacro 
+    Macro _sfence
+      CompilerIf #PB_Compiler_Backend = #PB_Backend_Asm  
+        !sfence 
+      CompilerElse 
+        CompilerIf #PB_Compiler_Processor = #PB_Processor_Arm32 Or #PB_Compiler_Processor = #PB_Processor_Arm64
+          !__sync_synchronize();
+        CompilerElse   
+          !__asm__("sfence" ::: "memory");   
+        CompilerEndIf   
+      CompilerEndIf   
+    EndMacro 
+    
+      Macro _lfence 
+        CompilerIf #PB_Compiler_Backend = #PB_Backend_Asm   
+          ; !lfence
+        CompilerElse
+          CompilerIf #PB_Compiler_Processor = #PB_Processor_Arm32 Or #PB_Compiler_Processor = #PB_Processor_Arm64 
+            !__sync_synchronize();
+          CompilerElse  
+            !__asm__("lfence" ::: "memory"); 
+          CompilerEndIf   
+        CompilerEndIf    
+      EndMacro 
   
   Macro _CONVERTUTF8() 
     
@@ -312,47 +313,48 @@ Module SQUINT
   Macro _SETNODE()
     
     If *node\vertex
-      
+       
       _GETNODECOUNT()
       If (offset <> 15 Or nodecount = 16)
-        XCHG_(@*node,*node\Vertex\e[offset] & #Squint_Pmask)  
+         XCHG_(@*node,(*node\Vertex\e[offset] & #Squint_Pmask))  
       Else  
         
-        XCHG_(@*this\write,*node)   
+        *node\Vertex = bts(*node\Vertex)
+               
         offset = nodecount
         nodecount+1 
         
         *new = AllocateMemory((nodecount)*SizeOf(squint_node)) 
         *old = *node\vertex & #Squint_Pmask
         CopyMemory(*old,*new,(offset)*SizeOf(squint_node)) 
-        
+                
         CompilerIf #PB_Compiler_64Bit; 
           *new | ((nodecount) << 48)
         CompilerEndIf  
-        
-        _gLockXCHG(node,new) 
+                
+        XCHG_(@*node\vertex,*new) 
         
         _SETINDEX(*node\squint,idx,offset)
         
-        *node = *node\Vertex\e[offset] & #Squint_Pmask
+        ;*node\Vertex = btc(*node\Vertex)
         
+        XCHG_(@*node,(*node\Vertex\e[offset] & #Squint_Pmask))
+               
         FreeMemory(*old) 
         
         If *this\merge  
-          *this\merge\size +SizeOf(squint_node) 
+          *this\merge\size + SizeOf(squint_node) 
         Else   
-          *this\size+SizeOf(squint_node) 
+          *this\size  +SizeOf(squint_node) 
         EndIf 
-        
-        XCHG_(@*this\write,0)   
-        
+                
       EndIf 
       
     Else
-      
-      XCHG_(@*this\write,*node)   
-      
+            
       *node\vertex = AllocateMemory(SizeOf(squint_Node))
+      
+      *node\Vertex = bts(*node\Vertex)
       
       CompilerIf #PB_Compiler_64Bit; 
         *node\vertex | (1 << 48)
@@ -360,16 +362,16 @@ Module SQUINT
       *node\squint = -1
       _SETINDEX(*node\squint,idx,0)
       
-      *node = *node\Vertex\e[0] & #Squint_Pmask
+      ;*node\Vertex = BTC(*node\Vertex)
+      
+      XCHG_(@*node,(*node\Vertex\e[0] & #Squint_Pmask))
       
       If *this\merge  
-        *this\merge\size +SizeOf(squint_node) 
+       *this\merge\size +SizeOf(squint_node) 
       Else   
         *this\size+SizeOf(squint_node) 
       EndIf 
-      
-      XCHG_(@*this\write,0)   
-      
+           
     EndIf 
     
   EndMacro
@@ -413,6 +415,29 @@ Module SQUINT
       
     CompilerEndIf 
   EndProcedure
+  
+  Procedure BTS(*node) 
+    CompilerIf #PB_Compiler_Backend = #PB_Backend_C 
+      !asm("lock bts %1, %0" : "+m" (p_node) : "r" (0)); 
+    CompilerElseIf #PB_Compiler_Processor = #PB_Processor_x86
+      !lock BTS dword [p.p_node],0 
+    CompilerElse
+      !lock BTS qword [p.p_node],0 
+    CompilerEndIf  
+         
+    ProcedureReturn *node  
+  EndProcedure 
+
+ Procedure BTC(*node) 
+   CompilerIf #PB_Compiler_Backend = #PB_Backend_C 
+      !asm("lock btc %1, %0" : "+m" (p_node) : "r" (0)); 
+    CompilerElseIf #PB_Compiler_Processor = #PB_Processor_x86
+      !lock BTC dword [p.p_node],0 
+    CompilerElse
+      !lock BTC qword [p.p_node],0 
+    CompilerEndIf  
+    ProcedureReturn *node
+ EndProcedure   
   
   ;-General functions 
   
@@ -585,6 +610,7 @@ Module SQUINT
     Protected *node.squint_node,idx,offset,nodecount,vchar.l,vret.l,count,*out
     Protected *new.squint_node,*old.squint_node,*adr 
     Protected bmerge      
+      
     
     _LockMutex(*this\mwrite)
     
@@ -598,6 +624,9 @@ Module SQUINT
         *node = *subtrie & #Squint_Pmask
       EndIf
     EndIf 
+    
+    ;XCHG_(@*this\write,*node) 
+    
     _CONVERTUTF8()
     
     While vchar
@@ -605,22 +634,27 @@ Module SQUINT
       idx = (vchar >> 4) & $f
       offset = (*node\squint >> (idx<<2)) & $f
       _SETNODE()     
+      
       idx = vchar & $0f
       offset = (*node\squint >> (idx<<2)) & $f
       _SETNODE()    
+      
       vchar >> 8
       count+1
       If vchar = 0
         *key+2
         _MODECHECK()
       EndIf
+      Delay(0)
     Wend
+    
     
     idx=0
     *out = *node 
     offset = *node\squint & $f
-    _SETNODE()
     
+    _SETNODE()
+    ; XCHG_(@*this\write,0);
     If bmerge 
       *this\merge\count+1 
     Else 
@@ -658,9 +692,9 @@ Module SQUINT
     Protected *node.squint_Node,idx,offset,nodecount,vchar.l,vret.l,count,*out
     
     If *subtrie = 0
-      *node = *this\root & #Squint_Pmask
+      XCHG_(@*node,(*this\root & #Squint_Pmask))
     Else 
-      *node = *subtrie & #Squint_Pmask
+      XCHG_(@*node,(*subtrie & #Squint_Pmask))
     EndIf 
     _CONVERTUTF8()
     
@@ -669,12 +703,12 @@ Module SQUINT
       While vchar
         
         l1:
-        If *this\write <> *node
+        If Not (*node & 1) 
           ;_lfence 
           offset = (*node\squint >> ((vchar & $f0) >> 2 )) & $f
           _GETNODECOUNT()
           If offset < nodecount
-            *node = (*node\Vertex\e[offset] & #Squint_Pmask)
+            XCHG_(@*node,(*node\Vertex\e[offset] & #Squint_Pmask))
           Else
             ProcedureReturn 0
           EndIf
@@ -684,12 +718,12 @@ Module SQUINT
         EndIf  
         
         l2:
-        If *this\write <> *node 
+        If Not (*node & 1) 
           ;_lfence 
           offset = (*node\squint >> ((vchar & $0f) << 2)) & $f
           _GETNODECOUNT()
           If offset < nodecount
-            *node = (*node\Vertex\e[offset] & #Squint_Pmask)
+            XCHG_(@*node,(*node\Vertex\e[offset] & #Squint_Pmask))
           Else
             ProcedureReturn 0
           EndIf
@@ -712,7 +746,7 @@ Module SQUINT
       _GETNODECOUNT()
       
       If offset <= nodecount
-        *node = (*node\Vertex\e[offset] & #Squint_Pmask)
+        XCHG_(@*node,(*node\Vertex\e[offset] & #Squint_Pmask)) 
         If bval 
           ProcedureReturn *node\value
         Else 
@@ -866,7 +900,7 @@ Module SQUINT
       While vchar
         
         l1:
-        If *this\write <> *node 
+        If Not (*node & 1)
           ;_lfence 
           offset = (*node\squint >> ((vchar & $f0) >> 2 )) & $f
           _GETNODECOUNT()
@@ -882,7 +916,7 @@ Module SQUINT
         EndIf  
         
         l2:
-        If *this\write <> *node
+        If Not (*node & 1)
           ;_lfence 
           offset = (*node\squint >> ((vchar & $0f) << 2)) & $f
           _GETNODECOUNT()
@@ -1059,6 +1093,7 @@ Module SQUINT
     
     Protected *node.squint_node,idx,offset,nodecount,vchar.i,vret.i,count
     Protected bmerge,*old,*new.squint_node,sqindex,*akey.Ascii 
+     
     
     _LockMutex(*this\mwrite)
     
@@ -1131,7 +1166,7 @@ Module SQUINT
     While count <= size  
       
       l1:
-      If *this\write = 0 
+      If Not (*node & 1) 
         ;_lfence 
         offset = (*node\squint >> ((*akey\a & $f0) >> 2 )) & $f
         _GETNODECOUNT()
@@ -1145,7 +1180,7 @@ Module SQUINT
       EndIf  
       
       l2:
-      If *this\write = 0 
+      If Not (*node & 1) 
         ;_lfence 
         offset = (*node\squint >> ((*akey\a & $0f) << 2)) & $f
         _GETNODECOUNT()
@@ -1390,17 +1425,17 @@ Module SQUINT
     
     Protected *node.squint_node,idx,offset,nodecount,vchar.i,vret.i,count,hash.q 
     Protected bmerge,*old,*new.squint_node,sqindex,*akey.Ascii 
+      
     
     _LockMutex(*this\mwrite)
     
     XCHG_(@bmerge,*this\merge) 
     If bmerge 
-      *node = *this\merge\root & #Squint_Pmask
+      XCHG_(@*node,(*this\merge\root & #Squint_Pmask))
     Else 
-      *node = *this\root & #Squint_Pmask
+      XCHG_(@*node,(*this\root & #Squint_Pmask))
     EndIf  
-    
-    *node = *this\root & #Squint_Pmask
+    XCHG_(@*this\write,*node) 
     
     If bhash 
       *akey=*key 
@@ -1418,14 +1453,18 @@ Module SQUINT
     EndIf 
     
     While count <= size  
+      
       idx = (*akey\a >> 4) & $f
       offset = (*node\squint >> (idx<<2)) & $f
       _SetNODE()
+      
       idx = (*akey\a & $f)
       offset = (*node\squint >> (idx<<2)) & $f
       _SetNODE()
       *akey-1 
       count+1
+      XCHG_(@*this\write,0);
+      Delay(0)
     Wend
     
     If bmerge 
@@ -1435,8 +1474,10 @@ Module SQUINT
     EndIf 
     
     *node\value = value
-    
+            
     _UnlockMutex(*this\mwrite)
+    
+    ProcedureReturn *node
     
   EndProcedure
   
@@ -1457,7 +1498,8 @@ Module SQUINT
   Procedure SquintGetNumeric(*this.squint,*key,size=#Squint_Integer,bhash=0)
     
     Protected *node.squint_Node,idx,offset,nodecount,vchar.i,vret.i,count,*akey.Ascii,hash.q,st  
-    *node = *this\root & #Squint_Pmask
+    
+    XCHG_(@*node,(*this\root & #Squint_Pmask))
     
     If bhash 
       *akey=*key 
@@ -1477,30 +1519,33 @@ Module SQUINT
     While count <= size  
       
       l1:
-      If *this\write <> *node 
-        ; _lfence 
-        offset = (*node\squint >> ((*akey\a & $f0) >> 2 )) & $f
+      If Not (*node & 1) 
+        
+        XCHG_(@offset,*node\squint) 
+        offset = (offset >> ((*akey\a & $f0) >> 2 )) & $f
         _GETNODECOUNT()
         If offset < nodecount
-          *node = (*node\Vertex\e[offset] & #Squint_Pmask)
+          XCHG_(@*node,(*node\Vertex\e[offset] & #Squint_Pmask))
         Else
           ProcedureReturn 0
         EndIf
       Else 
+        Delay(0)
         Goto l1  
       EndIf  
       
       l2:
-      If *this\write <> *node 
-        ;_lfence 
-        offset = (*node\squint >> ((*akey\a & $0f) << 2)) & $f
+      If Not (*node & 1)  
+        XCHG_(@offset,*node\squint) 
+        offset = (offset >> ((*akey\a & $0f) << 2)) & $f
         _GETNODECOUNT()
         If offset < nodecount
-          *node = (*node\Vertex\e[offset] & #Squint_Pmask)
+          XCHG_(@*node,(*node\Vertex\e[offset] & #Squint_Pmask)) 
         Else
           ProcedureReturn 0
         EndIf
       Else 
+        Delay(0)
         Goto l2  
       EndIf  
       *akey-1
@@ -1572,6 +1617,8 @@ Module SQUINT
     EndIf
     
     For a = 0 To 15 
+      ;XCHG_(@offset,*node\squint)
+      ;offset = (offset >> (a<<2)) & $f
       offset = (*node\squint >> (a<<2)) & $f
       If (*node\vertex And *node\squint)
         _GETNODECOUNT()
@@ -1722,7 +1769,7 @@ CompilerIf #PB_Compiler_IsMainFile
     
   EndProcedure
   
-  ;OnErrorCall(@ErrorHandler())
+  OnErrorCall(@ErrorHandler())
   
   Procedure CBSquint(*key,*value,*userData)  
     Protected sout.s  
@@ -1927,10 +1974,10 @@ CompilerIf #PB_Compiler_IsMainFile
         
     OpenConsole()
     
-    #TestNumeric = 0
+    #TestNumeric = 1
     #Randomkeys = 1
         
-    Global lt = 1 << 24  
+    Global lt = 0;1 << 1  
     
     Global gQuit,lt,a,num,memsize 
     Global keylen,avgkeylen  
@@ -2027,8 +2074,7 @@ CompilerIf #PB_Compiler_IsMainFile
           writekey+ 4 
         CompilerElse   
           key = gkeys(num) 
-          
-          If SquintSetNode(sq,0,@key,Val(key))
+         If SquintSetNode(sq,0,@key,Val(key))
             len = StringByteLength(key)
             keylen + len
             writekey + Len
@@ -2052,7 +2098,7 @@ CompilerIf #PB_Compiler_IsMainFile
       Repeat
         CompilerIf #TestNumeric = 0 
           num = Random(lt,1) 
-          key = Left(Hex(num),2)
+          key = Left(gkeys(num),3) 
           If key <> "" 
             sq\EnumNode(0,@key,@CBEnum(),*ct)
           EndIf   
@@ -2139,17 +2185,7 @@ CompilerIf #PB_Compiler_IsMainFile
     out +  "Enums Keys " +  FormatNumber(totalenum,0) + #CRLF$
     out +  "Enum Rate "  +  FormatNumber(Enumkey/1024/1024,2,".",",") + " mb p/s"  + #CRLF$ 
     out +  #CRLF$
-    
-    CompilerIf #TestNumeric = 0 
-      
-      For a = 1 To gcount-1 
-        If sq\Get(0,@gkeys(a)) <>  Val(gkeys(a)) 
-          PrintN("error " + Str(a) + " " + Str(sq\Get(0,@gkeys(a))))  
-        EndIf   
-      Next   
-      
-    CompilerEndIf 
-       
+          
     out + tout 
     Print(out) 
     SetClipboardText(out)
