@@ -2,7 +2,7 @@
 Macro Comments() 
   ; SQUINT 3, Sparse Quad Union Indexed Nibble Trie
   ; Copyright Andrew Ferguson aka Idle (c) 2020 - 2024 
-  ; Version 3.2.2 b2
+  ; Version 3.2.2 b1
   ; PB 5.72-6.02b 32bit/64bit asm and c backends for Windows,Mac OSX,Linux,PI,M1
   ; Thanks Wilbert for the high low insight and utf8 conversion help.
   ; Squint is a compact prefix Trie indexed by nibbles into a sparse array with performance metrics close to a map
@@ -178,8 +178,8 @@ Module SQUINT
     CompilerIf #PB_Compiler_32Bit 
       nodecount = MemorySize(*node\vertex) / SizeOf(squint_node)
     CompilerElse
-      XCHG_(@nodecount,*node\vertex) 
-      nodecount >> 48 ;= (*node\vertex >> 48)
+      ;XCHG_(@nodecount,*node\vertex) 
+      nodecount = (*node\vertex >> 48)
     CompilerEndIf
   EndMacro
   
@@ -335,9 +335,7 @@ Module SQUINT
         XCHG_(@*node\vertex,*new) 
         
         _SETINDEX(*node\squint,idx,offset)
-        
-        *node\Vertex = btc(*node\Vertex)
-        
+                        
         XCHG_(@*node,(*node\Vertex\e[offset] & #Squint_Pmask))
                
         FreeMemory(*old) 
@@ -829,7 +827,7 @@ Module SQUINT
   EndProcedure
   
   Procedure IEnum(*this.squint,*node.squint_Node,depth,*pfn.squint_CB,*outkey,*userdata=0)
-    Protected a.i,offset,nodecount,*mem.Ascii;,*tnode 
+    Protected a.i,offset,nodecount,*mem.Ascii
     
     If Not *node
       ProcedureReturn 0
@@ -842,7 +840,6 @@ Module SQUINT
         _GETNODECOUNT()
         If (offset <> 15 Or nodecount = 16)
           _POKENHL(*outkey,depth,a)
-          ;*tnode = *node\Vertex\e[offset] & #Squint_Pmask
           If IEnum(*this,(*node\Vertex\e[offset] & #Squint_Pmask),depth+1,*pfn,*outkey,*userdata) = 0 
             Break 
           EndIf  
@@ -1468,7 +1465,6 @@ Module SQUINT
       _SetNODE()
       *akey-1 
       count+1
-      XCHG_(@*this\write,0);
       Delay(0)
     Wend
     
