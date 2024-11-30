@@ -2,7 +2,7 @@
 Macro Comments() 
   ; SQUINT 3, Sparse Quad Union Indexed Nibble Trie
   ; Copyright Andrew Ferguson aka Idle (c) 2020 - 2024 
-  ; Version 3.2.2 b1
+  ; Version 3.2.2 b2
   ; PB 5.72-6.02b 32bit/64bit asm and c backends for Windows,Mac OSX,Linux,PI,M1
   ; Thanks Wilbert for the high low insight and utf8 conversion help.
   ; Squint is a compact prefix Trie indexed by nibbles into a sparse array with performance metrics close to a map
@@ -178,7 +178,6 @@ Module SQUINT
     CompilerIf #PB_Compiler_32Bit 
       nodecount = MemorySize(*node\vertex) / SizeOf(squint_node)
     CompilerElse
-      ;XCHG_(@nodecount,*node\vertex) 
       nodecount = (*node\vertex >> 48)
     CompilerEndIf
   EndMacro
@@ -227,30 +226,29 @@ Module SQUINT
     CompilerEndIf 
   EndMacro
   
-  ;   
-    Macro _sfence
-      CompilerIf #PB_Compiler_Backend = #PB_Backend_Asm  
-        !sfence 
-      CompilerElse 
-        CompilerIf #PB_Compiler_Processor = #PB_Processor_Arm32 Or #PB_Compiler_Processor = #PB_Processor_Arm64
-          !__sync_synchronize();
-        CompilerElse   
-          !__asm__("sfence" ::: "memory");   
-        CompilerEndIf   
+  Macro _sfence
+    CompilerIf #PB_Compiler_Backend = #PB_Backend_Asm  
+      !sfence 
+    CompilerElse 
+      CompilerIf #PB_Compiler_Processor = #PB_Processor_Arm32 Or #PB_Compiler_Processor = #PB_Processor_Arm64
+        !__sync_synchronize();
+      CompilerElse   
+        !__asm__("sfence" ::: "memory");   
       CompilerEndIf   
-    EndMacro 
-    
-      Macro _lfence 
-        CompilerIf #PB_Compiler_Backend = #PB_Backend_Asm   
-          ; !lfence
-        CompilerElse
-          CompilerIf #PB_Compiler_Processor = #PB_Processor_Arm32 Or #PB_Compiler_Processor = #PB_Processor_Arm64 
-            !__sync_synchronize();
-          CompilerElse  
-            !__asm__("lfence" ::: "memory"); 
-          CompilerEndIf   
-        CompilerEndIf    
-      EndMacro 
+    CompilerEndIf   
+  EndMacro 
+  
+  Macro _lfence 
+    CompilerIf #PB_Compiler_Backend = #PB_Backend_Asm   
+       !lfence
+    CompilerElse
+      CompilerIf #PB_Compiler_Processor = #PB_Processor_Arm32 Or #PB_Compiler_Processor = #PB_Processor_Arm64 
+        !__sync_synchronize();
+      CompilerElse  
+        !__asm__("lfence" ::: "memory"); 
+      CompilerEndIf   
+    CompilerEndIf    
+  EndMacro 
   
   Macro _CONVERTUTF8() 
     
@@ -373,8 +371,7 @@ Module SQUINT
     EndIf 
     
   EndMacro
-  
-  ;general Xchg function 
+     
   Procedure XCHG_(*ptr.Integer,v1) 
     
     CompilerIf #PB_Compiler_Backend = #PB_Backend_C 
@@ -903,7 +900,6 @@ Module SQUINT
           _GETNODECOUNT()
           If offset < nodecount
             *node = (*node\Vertex\e[offset] & #Squint_Pmask)
-            ;XCHG_(@*node,(*node\Vertex\e[offset] & #Squint_Pmask))
           Else
             bnmerge = 1
             Break 
@@ -920,7 +916,6 @@ Module SQUINT
           _GETNODECOUNT()
           If offset < nodecount
             *node = (*node\Vertex\e[offset] & #Squint_Pmask)
-            ;XCHG_(@*node,(*node\Vertex\e[offset] & #Squint_Pmask))
           Else
             bnmerge = 1 
             Break 
@@ -1169,7 +1164,6 @@ Module SQUINT
       
       l1:
       If Not (*node & 1) 
-       
         offset = (*node\squint >> ((*akey\a & $f0) >> 2 )) & $f
         _GETNODECOUNT()
         If offset < nodecount
@@ -1183,8 +1177,7 @@ Module SQUINT
       
       l2:
       If Not (*node & 1) 
-        
-        offset = (*node\squint >> ((*akey\a & $0f) << 2)) & $f
+       offset = (*node\squint >> ((*akey\a & $0f) << 2)) & $f
         _GETNODECOUNT()
         If offset < nodecount
           *node = (*node\Vertex\e[offset] & #Squint_Pmask)
@@ -1973,10 +1966,10 @@ CompilerIf #PB_Compiler_IsMainFile
         
     OpenConsole()
     
-    #TestNumeric = 0
+    #TestNumeric = 1
     #Randomkeys = 1
         
-    Global lt = 1 ;<< 4  
+    Global lt = 1 ;<< 22  
     
     Global gQuit,lt,a,num,memsize 
     Global keylen,avgkeylen  
@@ -1989,9 +1982,9 @@ CompilerIf #PB_Compiler_IsMainFile
     
     Global NUMTHREADS = CountCPUs(#PB_System_CPUs) 
     
-    If NUMTHREADS < 12 
+    If NUMTHREADS < 6 
       MessageRequester("Squint thread tests", "system doesn't have enough core threads for tests") 
-      NUMTHREADS = 3   
+      NUMTHREADS = 6   
     EndIf   
     
     If MessageRequester("begin test","Num items " + FormatNumber(lt,0,".",",") + " lookups over 1 second",#PB_MessageRequester_YesNo) <> #PB_MessageRequester_Yes     
@@ -2117,7 +2110,7 @@ CompilerIf #PB_Compiler_IsMainFile
     Global Dim counts.tdata(NUMTHREADS) 
     Global Dim threads(NUMTHREADS) 
     
-    For a = 0 To 7
+    For a = 0 To NUMTHREADS-5
       counts(a)\type = "Read"
       threads(a) = CreateThread(@_read(),@counts(a)\count) 
     Next 
