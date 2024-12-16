@@ -1,6 +1,6 @@
 ![SQUINT3 Version][badge squint]&nbsp;&nbsp;
 ![PureBasic Version][badge purebasic]&nbsp;&nbsp;
-![Eclipse v2 License][badge license]]&nbsp;&nbsp;
+![Eclipse v2 License][badge eclipse]&nbsp;&nbsp;
 
 # SQUINT3 (Sparse Quad Union Indexed Nibble Trie)
 
