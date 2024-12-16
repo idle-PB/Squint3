@@ -2,7 +2,7 @@
 Macro Comments() 
   ; SQUINT 3, Sparse Quad Union Indexed Nibble Trie
   ; Copyright Andrew Ferguson aka Idle (c) 2020 - 2024 
-  ; Version 3.2.2 b3
+  ; Version 3.2.2 b4
   ; PB 5.72-6.02b 32bit/64bit asm and c backends for Windows,Mac OSX,Linux,PI,M1
   ; Thanks Wilbert for the high low insight and utf8 conversion help.
   ; Squint is a lock free concurrent compact prefix Trie indexed by nibbles into a sparse array
@@ -161,7 +161,7 @@ Module SQUINT
     CompilerIf #PB_Compiler_32Bit 
       nodecount = MemorySize(*node\vertex) / SizeOf(squint_node)
     CompilerElse
-      nodecount = (*node\vertex >> 48)
+      nodecount = (*node\vertex >> 48) 
     CompilerEndIf
   EndMacro
   
@@ -393,7 +393,7 @@ Module SQUINT
       
     CompilerEndIf 
   EndProcedure
-  
+      
   Procedure BTS(*node) 
     CompilerIf #PB_Compiler_Backend = #PB_Backend_C 
       !asm("lock bts %1, %0" : "+m" (p_node) : "r" (0)); 
@@ -622,7 +622,7 @@ Module SQUINT
         *key+2
         _MODECHECK()
       EndIf
-      Delay(0)
+     ; Delay(0)
     Wend
     
     
@@ -1422,7 +1422,7 @@ Module SQUINT
         hash = $3631754B22FF2D5C * (count + *akey\a) ! (hash << 2) ! (hash >> 2);
         *akey + 1
         count+1 
-      Until count >= size 
+      Until count > size 
       count = 0 
       size = 8
       *akey = @hash+(#Squint_Integer-1)
@@ -1430,7 +1430,7 @@ Module SQUINT
       *akey = *key+(size-1)
     EndIf 
     
-    While count <= size  
+    While count < size  
       
       idx = (*akey\a >> 4) & $f
       offset = (*node\squint >> (idx<<2)) & $f
@@ -1441,7 +1441,7 @@ Module SQUINT
       _SetNODE()
       *akey-1 
       count+1
-      Delay(0)
+      ;Delay(0)
     Wend
     
     If bmerge 
@@ -1485,7 +1485,7 @@ Module SQUINT
         hash = $3631754B22FF2D5C * (count + *akey\a) ! (hash << 2) ! (hash >> 2);
         *akey + 1
         count+1 
-      Until count >= size 
+      Until count > size 
       count = 0 
       size = 8
       *akey = @hash+(#Squint_Integer-1)
@@ -1493,14 +1493,14 @@ Module SQUINT
       *akey = *key+(size-1)
     EndIf 
     
-    While count <= size  
+    While count < size  
       
       l1:
       If Not (*node & 1) 
         
+        _GETNODECOUNT()
         XCHG_(@offset,*node\squint) 
         offset = (offset >> ((*akey\a & $f0) >> 2 )) & $f
-        _GETNODECOUNT()
         If offset < nodecount
           XCHG_(@*node,(*node\Vertex\e[offset] & #Squint_Pmask))
         Else
@@ -1513,9 +1513,9 @@ Module SQUINT
       
       l2:
       If Not (*node & 1)  
+         _GETNODECOUNT()
         XCHG_(@offset,*node\squint) 
         offset = (offset >> ((*akey\a & $0f) << 2)) & $f
-        _GETNODECOUNT()
         If offset < nodecount
           XCHG_(@*node,(*node\Vertex\e[offset] & #Squint_Pmask)) 
         Else
@@ -1555,7 +1555,7 @@ Module SQUINT
         hash = $3631754B22FF2D5C * (count + *akey\a) ! (hash << 2) ! (hash >> 2);
         *akey + 1
         count+1 
-      Until count >= size 
+      Until count > size 
       count = 0 
       size = 8
       *akey = @hash+(#Squint_Integer-1)
@@ -1563,7 +1563,7 @@ Module SQUINT
       *akey = *key+(size-1)
     EndIf 
     
-    While count <= size 
+    While count < size 
       offset = (*node\squint >> ((*akey\a & $f0) >> 2 )) & $f
       _GETNODECOUNT()
       If offset < nodecount
@@ -1598,12 +1598,14 @@ Module SQUINT
       If (*node\vertex And *node\squint)
         _GETNODECOUNT()
         If (offset <> 15 Or nodecount = 16)
-          _POKENHL(*outkey,depth,a)
-          IEnumNumeric(*this,*node\Vertex\e[offset] & #Squint_Pmask,depth+1,*pfn,*outkey,size,*userdata)
+            _POKENHL(*outkey,depth,a)
+           If IEnumNumeric(*this,*node\Vertex\e[offset] & #Squint_Pmask,depth+1,*pfn,*outkey,size,*userdata) = 0 
+            Break 
+          EndIf   
         EndIf
       EndIf
     Next
-    
+        
     If *node\vertex=0
       vchar = PeekI(*outkey) 
       CompilerIf #PB_Compiler_Backend = #PB_Backend_C 
@@ -1632,7 +1634,7 @@ Module SQUINT
         EndIf
       EndIf 
     EndIf
-    
+       
     ProcedureReturn *node
   EndProcedure
   
@@ -1663,7 +1665,7 @@ Module SQUINT
       If size > 8 
         IEnum(*this,*node,0,*pfn,@outkey,*userdata)
       Else 
-        IEnumNumeric(*this,*node,depth,*pfn,@out,size,*userdata)
+        IEnumNumeric(*this,*node,0,*pfn,@out,size,*userdata)
       EndIf   
     CompilerElse 
       If size > 4 
@@ -1864,6 +1866,15 @@ CompilerIf #PB_Compiler_IsMainFile
     PrintN("++++dump whole trie +++++")
     SquintWalkNode(sq,0,@CBSquint())   
     
+    sq\Free()
+    
+     Procedure CBSquintWalkNum(*key.Integer,value,*userData)
+      PrintN(Str(*key\i) + " " + Str(value))  
+    EndProcedure
+    
+    
+    
+    sq.isquint = SquintNew()
     
     PrintN("-------Numeric------------") 
     
@@ -1873,18 +1884,17 @@ CompilerIf #PB_Compiler_IsMainFile
     sq\SetNumeric(@ikey,34567)
     ikey=23456 
     sq\SetNumeric(@ikey,23456) 
+    ikey=12345 
+    sq\SetNumeric(@ikey,12345) 
     
     ikey = 34567
     PrintN("get numeric key " + Str(sq\GetNumeric(@ikey)))                ;test get numeric    
     
     PrintN("-------Walk numeric ----") 
-    sq\WalkNumeric(@CBSquintWalk())           ;walk the numeric thery return in sorted order     
+    sq\WalkNumeric(@CBSquintWalkNum())           ;walk the numeric they return in sorted order     
     
     sq\Free() 
-    
-    Procedure CBSquintWalkNum(*key.Integer,value,*userData)
-      PrintN(Str(*key\i) + " " + Str(value))  
-    EndProcedure
+       
     
     sq.isquint = SquintNew()
     ikey=1
@@ -1974,7 +1984,7 @@ CompilerIf #PB_Compiler_IsMainFile
       End 
     EndIf  
     
-    RandomSeed(124)
+   ; RandomSeed(124)
     
     For a = 1 To gnum 
       CompilerIf #Randomkeys  
