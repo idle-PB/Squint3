@@ -5,7 +5,7 @@ Macro Comments()
   ; Version 3.2.2 b2
   ; PB 5.72-6.02b 32bit/64bit asm and c backends for Windows,Mac OSX,Linux,PI,M1
   ; Thanks Wilbert for the high low insight and utf8 conversion help.
-  ; Squint is a compact prefix Trie indexed by nibbles into a sparse array with performance metrics close to a map
+  ; Squint is a lock free concurrent compact prefix Trie indexed by nibbles into a sparse array
   ; It provides O(K) performance with a memory size ~32 times smaller than a 256 node trie
   ; Squint is at worst 2 times slower than a Map for set operations, look ups are closer to 1:1 or faster   
   ; as squint can bail out as soon as a char of a key isn't found unlike a map that has to evaluate the whole key. 
@@ -17,7 +17,7 @@ Macro Comments()
   ;     simillar structures   
   ;     https://dotat.at/prog/qp/blog-2015-10-04.html
   ;     https://cr.yp.to/critbit.html 
-  ;
+  ;     
   ; Squint supports Set, Get, Enum, EnumNode , Walk, WalkNode, Merge, Delete and Prune with a flag in Delete
   ; String keys can be Unicode, Ascii or UTF8 the type must be specified 
   ; all string keys get mapped to UTF8 
@@ -28,28 +28,11 @@ Macro Comments()
   ; keys can be anything that's serial and optionaly you can hash longer keys which will be sizeof integer 
   ;
   ; Note while you can mix string and numeric keys in the same trie it's not recomended unless you only require set and get 
-  ;   ;
-  ; MIT License
-  ; Permission is hereby granted, Free of charge, to any person obtaining a copy
-  ; of this software and associated documentation files (the "Software"), to deal
-  ; in the Software without restriction, including without limitation the rights
-  ; To use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-  ; copies of the Software, and to permit persons to whom the Software is
-  ; furnished to do so, subject to the following conditions:
-  ; 
-  ; The above copyright notice and this permission notice shall be included in all
-  ; copies or substantial portions of the Software.
-  ; 
-  ; THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS Or
-  ; IMPLIED, INCLUDING BUT Not LIMITED To THE WARRANTIES OF MERCHANTABILITY,
-  ; FITNESS For A PARTICULAR PURPOSE And NONINFRINGEMENT. IN NO EVENT SHALL THE
-  ; AUTHORS Or COPYRIGHT HOLDERS BE LIABLE For ANY CLAIM, DAMAGES Or OTHER
-  ; LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT Or OTHERWISE, ARISING FROM,
-  ; OUT OF Or IN CONNECTION With THE SOFTWARE Or THE USE Or OTHER DEALINGS IN THE
-  ; SOFTWARE. 
+  ;  
+  ; Eclipse Public License - v 2.0
   ;
   ; mzHash64 https://github.com/matteo65/mzHash64 
-  
+  ;
 EndMacro 
 
 DeclareModule SQUINT 
@@ -1966,7 +1949,7 @@ CompilerIf #PB_Compiler_IsMainFile
         
     OpenConsole()
     
-    #TestNumeric = 1
+    #TestNumeric = 0
     #Randomkeys = 1
         
     Global lt = 1 ;<< 22  
