@@ -1965,7 +1965,7 @@ CompilerIf #PB_Compiler_IsMainFile
         
     OpenConsole()
     
-    #TestNumeric = 0
+    #TestNumeric = 1
     #Randomkeys = 1
         
     Global lt = 1 ;<< 22  
