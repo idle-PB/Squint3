@@ -301,7 +301,7 @@ Module SQUINT
       Else  
         
         *node\Vertex = bts(*node\Vertex)
-               
+                      
         offset = nodecount
         nodecount+1 
         
@@ -615,7 +615,7 @@ Module SQUINT
       idx = vchar & $0f
       offset = (*node\squint >> (idx<<2)) & $f
       _SETNODE()    
-      
+            
       vchar >> 8
       count+1
       If vchar = 0
@@ -806,8 +806,14 @@ Module SQUINT
     EndIf
   EndProcedure
   
+  Structure stack 
+    *node 
+    a.i
+    depth.i
+  EndStructure  
+  
   Procedure IEnum(*this.squint,*node.squint_Node,depth,*pfn.squint_CB,*outkey,*userdata=0)
-    Protected a.i,offset,nodecount,*mem.Ascii
+    Protected a.i,b.i,offset,nodecount,*mem.Ascii
     
     If Not *node
       ProcedureReturn 0
@@ -837,6 +843,7 @@ Module SQUINT
       EndIf
     EndIf
     ProcedureReturn *node
+          
     
   EndProcedure
   
