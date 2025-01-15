@@ -2,7 +2,7 @@
 ;hashes the key to 64 bits and sets it in numeric mode, key is retrivable in the array from the stored value    
 ;trie size is the total set which is the array + trie, map sise is the peak size 
 
-XIncludeFile "../squint3.pbi"
+XIncludeFile "../squint3.3.pbi"
 
 UseModule SQUINT
 

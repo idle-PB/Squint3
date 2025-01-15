@@ -1,7 +1,7 @@
 ﻿;an example of scaning a text file to build a dictionary 
 ;to display it in sorted order and search for an item 
 
-XIncludeFile "../squint3.pbi"
+XIncludeFile "../squint3.3.pbi"
 
 UseModule SQUINT
 
@@ -44,6 +44,7 @@ Procedure ScanFile(file.s)
           Wend       
           If len 
             key = LCase(PeekS(*st,len))
+            ;Debug key
             ct = sq\Get(0,@key) + 1     ;look up the word and increment its count    
             sq\Set(0,@key,ct)           ;set the word in the dictionary  
             len = 0 
@@ -83,8 +84,9 @@ If sz
  Repeat 
     PrintN("enter a key to search for eg " + #DQUOTE$ + "ba" + #DQUOTE$ + " or type quit To end")   
     key = LCase(Input())    
+    Debug key 
     If (key <> "quit" And key <> "end") 
-       sq\Enum(@key,@CBSearch())  ;search the dictionary 
+       sq\EnumNode(0,@key,@CBSearch())  ;search the dictionary 
     Else 
       Break 
     EndIf   

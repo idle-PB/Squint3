@@ -889,6 +889,9 @@ Module SQUINT
           offset = (*node\squint >> ((vchar & $f0) >> 2 )) & $f
           _GETNODECOUNT()
           If offset < nodecount
+            *mem = @outkey+(depth>>1) 
+            *mem\a = (*mem\a & $0f) | (((vchar >> 4) & $f)<<4)
+            depth+1
             *node = (*node\Vertex\e[offset] & #Squint_Pmask)
           Else
             bnmerge = 1
@@ -905,6 +908,9 @@ Module SQUINT
           offset = (*node\squint >> ((vchar & $0f) << 2)) & $f
           _GETNODECOUNT()
           If offset < nodecount
+            *mem = @outkey+(depth>>1) 
+            *Mem\a = ((*Mem\a & $f0) | (vchar & $f))
+            depth+1
             *node = (*node\Vertex\e[offset] & #Squint_Pmask)
           Else
             bnmerge = 1 
@@ -1287,7 +1293,7 @@ Module SQUINT
     
     *akey = *key 
     
-    While count <= size  
+    While count < size  
       
       offset = (*node\squint >> ((*akey\a & $f0) >> 2 )) & $f
       _GETNODECOUNT()
@@ -1965,7 +1971,7 @@ CompilerIf #PB_Compiler_IsMainFile
         
     OpenConsole()
     
-    #TestNumeric = 1
+    #TestNumeric = 0
     #Randomkeys = 1
         
     Global lt = 1 ;<< 22  
@@ -2126,9 +2132,9 @@ CompilerIf #PB_Compiler_IsMainFile
     counts(a)\type = "Enum" 
     Threads(a) = CreateThread(@_enum(),@counts(a)\count) 
     
-    If MessageRequester("begin","Num items " + FormatNumber(lt,0,".",",") + " lookups over 1 second",#PB_MessageRequester_YesNo) <> #PB_MessageRequester_Yes     
-      End 
-    EndIf 
+   If MessageRequester("begin","Num items " + FormatNumber(lt,0,".",",") + " lookups over 1 second",#PB_MessageRequester_YesNo) <> #PB_MessageRequester_Yes     
+     End 
+   EndIf 
     
     For a = 0 To NUMTHREADS-1 
       SignalSemaphore(start)

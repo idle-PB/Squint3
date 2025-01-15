@@ -3,7 +3,7 @@
 ;for instance you could store strucutres like points and rect, or store long hashes        
 ;in this example it shows how you can mix stringkeys with binary keys  
 
-XIncludeFile "../squint3.pbi"
+XIncludeFile "../squint3.3.pbi"
 
 UseModule SQUINT
 
@@ -83,11 +83,11 @@ For a = 1 To numitems
   FreeMemory(*arRandLC(a))
 Next    
 
-sq\WalkBinary(0,@cbWalk())  ;dumps the whole trie in sorted order subtrie "BinaryKeysLC:" comes before "BinaryKeysUC:"  
+sq\WalkBinary(0,@cbWalk(),keysize)  ;dumps the whole trie in sorted order subtrie "BinaryKeysLC:" comes before "BinaryKeysUC:"  
  
 PrintN("Enum from B ++++++++++++") 
 
-ikey =  'B' 
+ikey =  'B'  
 sq\EnumBinary(subtrieUC,@ikey,1,@cbEnum())  ;list the trie from 'B' under the subtrie "BinaryKeysUC:B" 
 
 PrintN("Repeat Enum after delete ") 
