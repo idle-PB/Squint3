@@ -2,7 +2,7 @@
 Macro Comments() 
   ; SQUINT 3, Sparse Quad Union Indexed Nibble Trie
   ; Copyright Andrew Ferguson aka Idle (c) 2020 - 2024 
-  ; Version 3.2.2 b4
+  ; Version 3.2.2 b5
   ; PB 5.72-6.02b 32bit/64bit asm and c backends for Windows,Mac OSX,Linux,PI,M1
   ; Thanks Wilbert for the high low insight and utf8 conversion help.
   ; Squint is a lock free concurrent compact prefix Trie indexed by nibbles into a sparse array
@@ -87,9 +87,9 @@ DeclareModule SQUINT
   Declare SquintEnum(*this.squint,*key,*pfn.squint_CB,*userdata=0,mode=#PB_Unicode)
   Declare SquintEnumNode(*this.squint,*subtrie,*key,*pfn.squint_CB,*userdata=0,mode=#PB_Unicode)
   
-  Declare SquintSetNumeric(*this.squint,*key,value.i,size=#Squint_Integer,bhash=0)
-  Declare SquintGetNumeric(*this.squint,*key,size = #Squint_Integer,bhash=0)
-  Declare SquintDeleteNumeric(*this.squint,*key,size = #Squint_Integer,bhash=0)
+  Declare SquintSetNumeric(*this.squint,key.i,value.i,size=#Squint_Integer,bhash=0)
+  Declare SquintGetNumeric(*this.squint,key.i,size = #Squint_Integer,bhash=0)
+  Declare SquintDeleteNumeric(*this.squint,key.i,size = #Squint_Integer,bhash=0)
   Declare SquintWalkNumeric(*this.squint,*pfn.squint_CB,size=#Squint_Integer,*userdata=0)  
   
   Declare SquintSetBinary(*this.squint,*subtrie,*key,value.i,size)
@@ -111,9 +111,9 @@ DeclareModule SQUINT
     Enum(*key,*pfn.squint_CB,*userdata=0,mode=#PB_Unicode)
     EnumNode(*subtrie,*key,*pfn.squint_CB,*userdata=0,mode=#PB_Unicode)
     Walk(*subtrie,*pfn.squint_CB,*userdata=0)
-    SetNumeric(*key,value.i,size=#Squint_Integer,bhash=0) 
-    GetNumeric(*key,size= #Squint_Integer,bhash=0) 
-    DeleteNumeric(*key,size=#Squint_Integer,bhash=0)
+    SetNumeric(key.i,value.i,size=#Squint_Integer,bhash=0) 
+    GetNumeric(key.i,size= #Squint_Integer,bhash=0) 
+    DeleteNumeric(key.i,size=#Squint_Integer,bhash=0)
     WalkNumeric(*pfn.Squint_CB,size=#Squint_Integer,*userdata=0)
     SetBinary(*subtrie,*key,value.i,size) 
     GetBinary(*subtrie,*key,size) 
@@ -1295,29 +1295,44 @@ Module SQUINT
     
     While count < size  
       
-      offset = (*node\squint >> ((*akey\a & $f0) >> 2 )) & $f
-      _GETNODECOUNT()
-      If offset < nodecount
-        *mem = @outkey+(depth>>1) 
-        *mem\a = (*mem\a & $0f) | (((*akey\a >> 4) & $f)<<4)
-        depth+1
-        *node = (*node\Vertex\e[offset] & #Squint_Pmask)
-      Else
-        bnmerge=1
-        Break 
-      EndIf
+      l1:
+      If Not (*node & 1)
+        
+        offset = (*node\squint >> ((*akey\a & $f0) >> 2 )) & $f
+        _GETNODECOUNT()
+        If offset < nodecount
+          *mem = @outkey+(depth>>1) 
+          *mem\a = (*mem\a & $0f) | (((*akey\a >> 4) & $f)<<4)
+          depth+1
+          *node = (*node\Vertex\e[offset] & #Squint_Pmask)
+        Else
+          bnmerge=1
+          Break 
+        EndIf
+      Else 
+        Delay(0)
+        Goto l1  
+      EndIf  
       
-      offset = (*node\squint >> ((*akey\a & $0f) << 2)) & $f
-      _GETNODECOUNT()
-      If offset < nodecount
-        *mem = @outkey+(depth>>1) 
-        *Mem\a = ((*Mem\a & $f0) | (*akey\a & $f))
-        depth+1
-        *node = (*node\Vertex\e[offset] & #Squint_Pmask)
-      Else
-        bnmerge=1  
-        Break
-      EndIf
+      l2:
+      If Not (*node & 1)
+        
+        offset = (*node\squint >> ((*akey\a & $0f) << 2)) & $f
+        _GETNODECOUNT()
+        If offset < nodecount
+          *mem = @outkey+(depth>>1) 
+          *Mem\a = ((*Mem\a & $f0) | (*akey\a & $f))
+          depth+1
+          *node = (*node\Vertex\e[offset] & #Squint_Pmask)
+        Else
+          bnmerge=1  
+          Break
+        EndIf
+        
+      Else 
+        Delay(0)
+        Goto l2  
+      EndIf  
       
       *akey+1
       count+1
@@ -1412,7 +1427,7 @@ Module SQUINT
   ;#     sq\setNumeric(@ikey,123435,4)    
   ;################################################################################## 
   
-  Procedure SquintSetNumeric(*this.squint,*key,value.i,size=#Squint_Integer,bhash=0)
+  Procedure SquintSetNumeric(*this.squint,key.i,value.i,size=#Squint_Integer,bhash=0)
     
     Protected *node.squint_node,idx,offset,nodecount,vchar.i,vret.i,count,hash.q 
     Protected bmerge,*old,*new.squint_node,sqindex,*akey.Ascii 
@@ -1429,7 +1444,7 @@ Module SQUINT
     XCHG_(@*this\write,*node) 
     
     If bhash 
-      *akey=*key 
+      *akey=PeekI(@key)  
       hash = $D45E69F901E72147 ! bhash;
       Repeat 
         hash = $3631754B22FF2D5C * (count + *akey\a) ! (hash << 2) ! (hash >> 2);
@@ -1440,7 +1455,7 @@ Module SQUINT
       size = 8
       *akey = @hash+(#Squint_Integer-1)
     Else 
-      *akey = *key+(size-1)
+      *akey = @key+(size-1)
     EndIf 
     
     While count < size  
@@ -1485,14 +1500,14 @@ Module SQUINT
   ;#    x = sq\get(@ikey,4)      
   ;################################################################################## 
   
-  Procedure SquintGetNumeric(*this.squint,*key,size=#Squint_Integer,bhash=0)
+  Procedure SquintGetNumeric(*this.squint,key.i,size=#Squint_Integer,bhash=0)
     
     Protected *node.squint_Node,idx,offset,nodecount,vchar.i,vret.i,count,*akey.Ascii,hash.q,st  
     
     XCHG_(@*node,(*this\root & #Squint_Pmask))
     
     If bhash 
-      *akey=*key 
+      *akey=PeekI(@key)  
       hash = $D45E69F901E72147 ! bhash;
       Repeat 
         hash = $3631754B22FF2D5C * (count + *akey\a) ! (hash << 2) ! (hash >> 2);
@@ -1503,7 +1518,7 @@ Module SQUINT
       size = 8
       *akey = @hash+(#Squint_Integer-1)
     Else 
-      *akey = *key+(size-1)
+      *akey = @key+(size-1)
     EndIf 
     
     While count < size  
@@ -1557,12 +1572,12 @@ Module SQUINT
   ;#     x = sq\DeleteNumeric(@ikey,4)      
   ;################################################################################## 
   
-  Procedure SquintDeleteNumeric(*this.squint,*key,size=#Squint_Integer,bhash=0)    
+  Procedure SquintDeleteNumeric(*this.squint,key.i,size=#Squint_Integer,bhash=0)    
     Protected *node.squint_node,idx,*mem.Character,offset,nodecount,vchar.i,vret.i,count,*akey.Ascii,hash.q 
     *node = *this\root & #Squint_Pmask
     
     If bhash 
-      *akey=*key 
+      *akey=PeekI(@key)  
       hash = $D45E69F901E72147 ! bhash;
       Repeat 
         hash = $3631754B22FF2D5C * (count + *akey\a) ! (hash << 2) ! (hash >> 2);
@@ -1573,7 +1588,7 @@ Module SQUINT
       size = 8
       *akey = @hash+(#Squint_Integer-1)
     Else 
-      *akey = *key+(size-1)
+      *akey = @key+(size-1)
     EndIf 
     
     While count < size 
@@ -1890,17 +1905,14 @@ CompilerIf #PB_Compiler_IsMainFile
     
     PrintN("-------Numeric------------") 
     
-    ikey=-1
-    sq\SetNumeric(@ikey,12345)                ;Add numeric keys   
-    ikey=34567
-    sq\SetNumeric(@ikey,34567)
-    ikey=23456 
-    sq\SetNumeric(@ikey,23456) 
-    ikey=12345 
-    sq\SetNumeric(@ikey,12345) 
     
-    ikey = 34567
-    PrintN("get numeric key " + Str(sq\GetNumeric(@ikey)))                ;test get numeric    
+    sq\SetNumeric(-1,12345)                ;Add numeric keys   
+    sq\SetNumeric(34567,34567)
+    sq\SetNumeric(23456,23456) 
+    sq\SetNumeric(12345,12345) 
+    
+    
+    PrintN("get numeric key " + Str(sq\GetNumeric(34567)))                ;test get numeric    
     
     PrintN("-------Walk numeric ----") 
     sq\WalkNumeric(@CBSquintWalkNum())           ;walk the numeric they return in sorted order     
@@ -1909,23 +1921,16 @@ CompilerIf #PB_Compiler_IsMainFile
        
     
     sq.isquint = SquintNew()
-    ikey=1
-    sq\SetNumeric(@ikey,123,4)
-    ikey=4
-    sq\SetNumeric(@ikey,456,4)
-    ikey=8
-    sq\SetNumeric(@ikey,8910,4)
+    sq\SetNumeric(1,123,4)
+    sq\SetNumeric(4,456,4)
+    sq\SetNumeric(8,8910,4)
     
-    ikey=1
-    PrintN(Str(sq\GetNumeric(@ikey,4))) 
-    ikey=2
-    PrintN(Str(sq\GetNumeric(@ikey,4))) 
-    ikey=4
-    PrintN(Str(sq\GetNumeric(@ikey,4))) 
-    ikey=6
-    PrintN(Str(sq\GetNumeric(@ikey,4))) 
-    ikey=8
-    PrintN(Str(sq\GetNumeric(@ikey,4))) 
+   
+    PrintN(Str(sq\GetNumeric(1,4))) 
+    PrintN(Str(sq\GetNumeric(2,4))) 
+    PrintN(Str(sq\GetNumeric(4,4))) 
+    PrintN(Str(sq\GetNumeric(6,4))) 
+    PrintN(Str(sq\GetNumeric(8,4))) 
     
     PrintN("-------Walk numeric ----") 
     sq\WalkNumeric(@CBSquintWalkNum(),4)      
@@ -1938,6 +1943,7 @@ CompilerIf #PB_Compiler_IsMainFile
       sum+a
     Next  
     RandomSeed(1) 
+    ct=0
     For a = 1 To 100 
       RandomData(*rd,256)
       ct + sq\GetNumeric(*rd,256,1) 
@@ -1971,7 +1977,7 @@ CompilerIf #PB_Compiler_IsMainFile
         
     OpenConsole()
     
-    #TestNumeric = 0
+    #TestNumeric = 1
     #Randomkeys = 1
         
     Global lt = 1 ;<< 22  
@@ -2015,7 +2021,7 @@ CompilerIf #PB_Compiler_IsMainFile
       key = gkeys(gcount);
       CompilerIf #TestNumeric 
         keylen+4 
-        sq\SetNumeric(@num,1,4) 
+        sq\SetNumeric(num,1,4) 
       CompilerElse   
         
         keylen+StringByteLength(key) 
@@ -2040,7 +2046,7 @@ CompilerIf #PB_Compiler_IsMainFile
         CompilerEndIf    
         
         CompilerIf #TestNumeric  
-          x = SquintGetNumeric(sq,@num,4)
+          x = SquintGetNumeric(sq,num,4)
           cx = (1 | x)   
           readkey+4
         CompilerElse   
@@ -2066,7 +2072,7 @@ CompilerIf #PB_Compiler_IsMainFile
         num & gmask      
         
         CompilerIf #TestNumeric  
-          SquintSetNumeric(sq,@num,*ct\i,4)  
+          SquintSetNumeric(sq,num,*ct\i,4)  
           keylen + 4 
           writekey+ 4 
         CompilerElse   
