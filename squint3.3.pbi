@@ -90,7 +90,7 @@ DeclareModule SQUINT
   Declare SquintSetNumeric(*this.squint,key.i,value.i,size=#Squint_Integer,bhash=0)
   Declare SquintGetNumeric(*this.squint,key.i,size = #Squint_Integer,bhash=0)
   Declare SquintDeleteNumeric(*this.squint,key.i,size = #Squint_Integer,bhash=0)
-  Declare SquintWalkNumeric(*this.squint,*pfn.squint_CB,size=#Squint_Integer,*userdata=0)  
+  Declare SquintWalkNumeric(*this.squint,*pfn.squint_CB,size=#Squint_Integer,*userdata=0,*userdata1=0,*userdata2=0)   
   
   Declare SquintSetBinary(*this.squint,*subtrie,*key,value.i,size)
   Declare SquintGetBinary(*this.squint,*subtrie,*key,size)
@@ -114,7 +114,7 @@ DeclareModule SQUINT
     SetNumeric(key.i,value.i,size=#Squint_Integer,bhash=0) 
     GetNumeric(key.i,size= #Squint_Integer,bhash=0) 
     DeleteNumeric(key.i,size=#Squint_Integer,bhash=0)
-    WalkNumeric(*pfn.Squint_CB,size=#Squint_Integer,*userdata=0)
+    WalkNumeric(*pfn.Squint_CB,size=#Squint_Integer,*userdata=0,*userdata1=0,*userdata2=0)
     SetBinary(*subtrie,*key,value.i,size) 
     GetBinary(*subtrie,*key,size) 
     DeleteBinary(*subtrie,*key,size,prune=0) 
@@ -633,9 +633,13 @@ Module SQUINT
     _SETNODE()
    
     If bmerge 
-      *this\merge\count+1 
+      If *node\value = 0  
+        *this\merge\count+1 
+      EndIf   
     Else 
-      *this\count +1
+      If *node\value = 0 
+        *this\count +1
+      EndIf   
     EndIf 
     
     If value 
@@ -1115,9 +1119,13 @@ Module SQUINT
     Wend
     
     If bmerge 
-      *this\merge\count+1 
+      If *node\value = 0  
+        *this\merge\count+1 
+      EndIf   
     Else 
-      *this\count +1
+      If *node\value = 0 
+        *this\count +1
+      EndIf   
     EndIf 
     
     If value 
@@ -1473,9 +1481,13 @@ Module SQUINT
     Wend
     
     If bmerge 
-      *this\merge\count+1 
+      If *node\value = 0  
+        *this\merge\count+1 
+      EndIf   
     Else 
-      *this\count +1
+      If *node\value = 0 
+        *this\count +1
+      EndIf   
     EndIf 
     
     *node\value = value
@@ -1614,7 +1626,7 @@ Module SQUINT
     EndIf
   EndProcedure
   
-  Procedure IEnumNumeric(*this.squint,*node.squint_Node,depth,*pfn.squint_CB,*outkey.integer,size,*userdata=0)
+  Procedure IEnumNumeric(*this.squint,*node.squint_Node,depth,*pfn.squint_CB,*outkey.integer,size,*userdata=0,*userdata1=0,*userdata2=0)
     Protected a.i,offset,nodecount,*mem.Ascii,vchar.i,vret.i 
     
     If Not *node
@@ -1627,7 +1639,7 @@ Module SQUINT
         _GETNODECOUNT()
         If (offset <> 15 Or nodecount = 16)
             _POKENHL(*outkey,depth,a)
-           If IEnumNumeric(*this,*node\Vertex\e[offset] & #Squint_Pmask,depth+1,*pfn,*outkey,size,*userdata) = 0 
+           If IEnumNumeric(*this,*node\Vertex\e[offset] & #Squint_Pmask,depth+1,*pfn,*outkey,size,*userdata,*userdata1,*userdata2) = 0 
             Break 
           EndIf   
         EndIf
@@ -1677,7 +1689,7 @@ Module SQUINT
   ;#     sq\WalkNumeric(@MyCallback())   
   ;################################################################################## 
   
-  Procedure SquintWalkNumeric(*this.squint,*pfn.squint_CB,size=#Squint_Integer,*userdata=0)       
+  Procedure SquintWalkNumeric(*this.squint,*pfn.squint_CB,size=#Squint_Integer,*userdata=0,*userdata1=0,*userdata2=0)       
     
     Protected depth,*node.squint_node,*new.squint,*old.squint,out.i,outkey.s{#SQUINT_MAX_KEY}        
     
@@ -1693,13 +1705,13 @@ Module SQUINT
       If size > 8 
         IEnum(*this,*node,0,*pfn,@outkey,*userdata)
       Else 
-        IEnumNumeric(*this,*node,0,*pfn,@out,size,*userdata)
+        IEnumNumeric(*this,*node,0,*pfn,@out,size,*userdata,*userdata1,*userdata2)
       EndIf   
     CompilerElse 
       If size > 4 
         IEnum(*this,*node,0,*pfn,@outkey,*userdata)
       Else 
-        IEnumNumeric(*this,*node,depth,*pfn,@out,size,*userdata)
+        IEnumNumeric(*this,*node,depth,*pfn,@out,size,*userdata,*userdata1,*userdata2)
       EndIf   
       
     CompilerEndIf  
@@ -1950,6 +1962,7 @@ CompilerIf #PB_Compiler_IsMainFile
     Next  
     Debug ct 
     Debug sum 
+    Debug sq\NumKeys() 
     
     sq\Free()   
     
