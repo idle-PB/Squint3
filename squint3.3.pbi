@@ -2,7 +2,7 @@
 Macro Comments() 
   ; SQUINT 3, Sparse Quad Union Indexed Nibble Trie
   ; Copyright Andrew Ferguson aka Idle (c) 2020 - 2024 
-  ; Version 3.2.2 b5
+  ; Version 3.2.2 b6
   ; PB 5.72-6.02b 32bit/64bit asm and c backends for Windows,Mac OSX,Linux,PI,M1
   ; Thanks Wilbert for the high low insight and utf8 conversion help.
   ; Squint is a lock free concurrent compact prefix Trie indexed by nibbles into a sparse array
@@ -415,8 +415,8 @@ Module SQUINT
       !lock BTC qword [p.p_node],0 
     CompilerEndIf  
     ProcedureReturn *node
- EndProcedure   
-  
+  EndProcedure  
+      
   ;-General functions 
   
   ;##################################################################################
@@ -453,20 +453,22 @@ Module SQUINT
         _GETNODECOUNT()
         If (offset <> 15 Or nodecount = 16)
           *this\size - SizeOf(squint_node)
-          ISquintFree(*this,*node\Vertex\e[offset] & #Squint_Pmask)
+          ISquintFree(*this,*node\Vertex\e[offset] & #Squint_Pmask,*pfn)
         EndIf
       EndIf
     Next
     _LockMutex(*this\mwrite)
     If *node\vertex
       _GETNODECOUNT()
-      If *pfn 
-        If *node <> *this\root 
-          *pfn(*node\value)
-        EndIf   
-      EndIf 
       FreeMemory(*node\Vertex & #Squint_Pmask) 
       *node\vertex=0
+    ElseIf *node\vertex = 0 
+      If *pfn 
+        If *node\value 
+          *pfn(*node\value)
+        EndIf   
+     EndIf 
+      
     EndIf
     _UnlockMutex(*this\mwrite) 
     ProcedureReturn *node
@@ -809,13 +811,7 @@ Module SQUINT
       EndIf
     EndIf
   EndProcedure
-  
-  Structure stack 
-    *node 
-    a.i
-    depth.i
-  EndStructure  
-  
+    
   Procedure IEnum(*this.squint,*node.squint_Node,depth,*pfn.squint_CB,*outkey,*userdata=0)
     Protected a.i,b.i,offset,nodecount,*mem.Ascii
     
@@ -1477,7 +1473,7 @@ Module SQUINT
       _SetNODE()
       *akey-1 
       count+1
-      ;Delay(0)
+      
     Wend
     
     If bmerge 
@@ -1807,6 +1803,9 @@ CompilerIf #PB_Compiler_IsMainFile
     EndIf  
   EndProcedure
   
+  Procedure CBSquintFree(*mem)
+    Debug *mem 
+  EndProcedure  
   ;note you can use squint via raw pointer or via interface it's up to you   
   ;string keys can be either ascii, utf8 or unicode. you can also use numeric integers, while it's valid to mix them it's not really recomended yet 
   
@@ -1818,6 +1817,7 @@ CompilerIf #PB_Compiler_IsMainFile
     
     
     OpenConsole() 
+        
     ;test with interface  
     SubTrieA = sq\Set(0,@"subtrieA:",123)    ;Set it with utf8 flag it returns the root of the sub trie 
     
@@ -1905,7 +1905,7 @@ CompilerIf #PB_Compiler_IsMainFile
     PrintN("++++dump whole trie +++++")
     SquintWalkNode(sq,0,@CBSquint())   
     
-    sq\Free()
+    sq\Free(@CBSquintFree())
     
      Procedure CBSquintWalkNum(*key.Integer,value,*userData)
       PrintN(Str(*key\i) + " " + Str(value))  
@@ -1972,12 +1972,26 @@ CompilerIf #PB_Compiler_IsMainFile
     
     Global Enumkey 
     
+    #TestNumeric = 1
+    #Randomkeys = 1
+        
+    Global lt = 1 << 24  
+    
+    Global gQuit,lt,a,num,memsize 
+    Global keylen,avgkeylen  
+    Global start = CreateSemaphore()
+    Global gcount, gnum = (1 << 24)
+    Global gmask = gnum-1
+    Global Dim gkeys.s(gnum) 
+        
     Procedure CBEnum(*key,*value,*userData.integer)  
       Protected sout.s  
       sout = PeekS(*key,-1,#PB_UTF8)
       *userData\i + 1 
       Enumkey + StringByteLength(sout) 
-      ProcedureReturn 1 
+      If gquit = 0 
+        ProcedureReturn 1
+      EndIf   
     EndProcedure
     
     Procedure CBWalk(*key,value,*userData.Integer)
@@ -1990,17 +2004,7 @@ CompilerIf #PB_Compiler_IsMainFile
         
     OpenConsole()
     
-    #TestNumeric = 1
-    #Randomkeys = 1
-        
-    Global lt = 1 ;<< 22  
     
-    Global gQuit,lt,a,num,memsize 
-    Global keylen,avgkeylen  
-    Global start = CreateSemaphore()
-    Global gcount, gnum = (1 << 24)
-    Global gmask = gnum-1
-    Global Dim gkeys.s(gnum) 
         
     sq.isquint = SquintNew()
     
@@ -2015,7 +2019,7 @@ CompilerIf #PB_Compiler_IsMainFile
       End 
     EndIf  
     
-   ; RandomSeed(124)
+    RandomSeed(124)
     
     For a = 1 To gnum 
       CompilerIf #Randomkeys  
