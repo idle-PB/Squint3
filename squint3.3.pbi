@@ -2,8 +2,8 @@
 Macro Comments() 
   ; SQUINT 3, Sparse Quad Union Indexed Nibble Trie
   ; Copyright Andrew Ferguson aka Idle (c) 2020 - 2024 
-  ; Version 3.2.2 b6
-  ; PB 5.72-6.02b 32bit/64bit asm and c backends for Windows,Mac OSX,Linux,PI,M1
+  ; Version 3.2.2 b7
+  ; PB 5.72-6.02b 32bit/64bit asm and c backends for Windows,Mac OSX,Linux,PI,M1 
   ; Thanks Wilbert for the high low insight and utf8 conversion help.
   ; Squint is a lock free concurrent compact prefix Trie indexed by nibbles into a sparse array
   ; It provides O(K) performance with a memory size ~32 times smaller than a 256 node trie
@@ -393,30 +393,29 @@ Module SQUINT
       
     CompilerEndIf 
   EndProcedure
-      
-  Procedure BTS(*node) 
-    CompilerIf #PB_Compiler_Backend = #PB_Backend_C 
-      !asm("lock bts %1, %0" : "+m" (p_node) : "r" (0)); 
-    CompilerElseIf #PB_Compiler_Processor = #PB_Processor_x86
-      !lock BTS dword [p.p_node],0 
-    CompilerElse
-      !lock BTS qword [p.p_node],0 
-    CompilerEndIf  
-         
-    ProcedureReturn *node  
-  EndProcedure 
+    
+  Procedure BTS(*node)
+  CompilerIf #PB_Compiler_Backend = #PB_Backend_C
+    !__atomic_fetch_or((long*)&p_node, 1L, __ATOMIC_SEQ_CST);
+  CompilerElseIf #PB_Compiler_Processor = #PB_Processor_x86
+    !lock BTS dword [p.p_node], 0
+  CompilerElse
+    !lock BTS qword [p.p_node], 0
+  CompilerEndIf
+  ProcedureReturn *node
+EndProcedure
 
- Procedure BTC(*node) 
-   CompilerIf #PB_Compiler_Backend = #PB_Backend_C 
-      !asm("lock btc %1, %0" : "+m" (p_node) : "r" (0)); 
-    CompilerElseIf #PB_Compiler_Processor = #PB_Processor_x86
-      !lock BTC dword [p.p_node],0 
-    CompilerElse
-      !lock BTC qword [p.p_node],0 
-    CompilerEndIf  
-    ProcedureReturn *node
-  EndProcedure  
-      
+Procedure BTC(*node)
+  CompilerIf #PB_Compiler_Backend = #PB_Backend_C
+    !__atomic_fetch_and((long*)&p_node, ~1L, __ATOMIC_SEQ_CST);
+  CompilerElseIf #PB_Compiler_Processor = #PB_Processor_x86
+    !lock BTC dword [p.p_node], 0
+  CompilerElse
+    !lock BTC qword [p.p_node], 0
+  CompilerEndIf
+  ProcedureReturn *node
+EndProcedure
+  
   ;-General functions 
   
   ;##################################################################################
@@ -1645,7 +1644,7 @@ Module SQUINT
     If *node\vertex=0
       vchar = PeekI(*outkey) 
       CompilerIf #PB_Compiler_Backend = #PB_Backend_C 
-        CompilerIf #PB_Compiler_Processor = #PB_Processor_x64  
+        CompilerIf #PB_Compiler_Processor = #PB_Processor_x64  Or #PB_Compiler_Processor = #PB_Processor_Arm64
           !v_vchar = __builtin_bswap64(v_vchar);    
         CompilerElse 
           !v_vchar = __builtin_bswap32(v_vchar);     
